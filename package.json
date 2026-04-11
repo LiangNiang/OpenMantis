@@ -1,0 +1,41 @@
+{
+	"name": "openmantis",
+	"description": "A minimal multi-platform agentic chat framework built with Bun + Vercel AI SDK",
+	"license": "Apache-2.0",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/LiangNiang/OpenMantis"
+	},
+	"module": "src/index.ts",
+	"type": "module",
+	"private": true,
+	"workspaces": ["packages/*"],
+	"scripts": {
+		"dev": "LOG_LEVEL=debug bun --watch src/index.ts",
+		"dev:full": "bun run dev:web & DEV_WEB=true bun run dev",
+		"dev:web": "bun --filter @openmantis/web dev",
+		"start": "bin/openmantis start",
+		"stop": "bin/openmantis stop",
+		"restart": "bin/openmantis restart",
+		"typecheck": "bun x tsc --noEmit",
+		"check": "biome check --write --unsafe",
+		"build:web": "bun --filter @openmantis/web build"
+	},
+	"dependencies": {
+		"@openmantis/channel-feishu": "workspace:*",
+		"@openmantis/common": "workspace:*",
+		"@openmantis/channel-qq": "workspace:*",
+		"@openmantis/channel-wecom": "workspace:*",
+		"@openmantis/core": "workspace:*",
+		"@openmantis/scheduler": "workspace:*",
+		"@openmantis/web-server": "workspace:*",
+		"ai": "^6.0.138"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.4.9",
+		"@types/bun": "latest"
+	},
+	"peerDependencies": {
+		"typescript": "^6"
+	}
+}

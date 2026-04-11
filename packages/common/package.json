@@ -1,0 +1,30 @@
+{
+	"name": "@openmantis/common",
+	"private": true,
+	"type": "module",
+	"license": "Apache-2.0",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/LiangNiang/OpenMantis",
+		"directory": "packages/common"
+	},
+	"exports": {
+		"./types/channels": "./src/types/channels.ts",
+		"./types/scheduler": "./src/types/scheduler.ts",
+		"./types/tools": "./src/types/tools.ts",
+		"./types/tts": "./src/types/tts.ts",
+		"./logger": "./src/logger/index.ts",
+		"./paths": "./src/paths/index.ts",
+		"./config/schema": "./src/config/schema.ts",
+		"./config/sensitive": "./src/config/sensitive.ts",
+		"./config/merge": "./src/config/merge.ts"
+	},
+	"dependencies": {
+		"ai": "^6.0.138",
+		"consola": "^3.4.2",
+		"zod": "^4.3.6"
+	},
+	"devDependencies": {
+		"@types/bun": "latest"
+	}
+}

@@ -1,0 +1,24 @@
+{
+	"name": "@openmantis/tts",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts",
+		"./registry": "./src/registry.ts",
+		"./convert": "./src/convert.ts",
+		"./upload": "./src/upload.ts"
+	},
+	"dependencies": {
+		"@openmantis/common": "workspace:*",
+		"@larksuiteoapi/node-sdk": "^1.60.0"
+	},
+	"devDependencies": {
+		"@types/bun": "latest"
+	},
+	"license": "Apache-2.0",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/LiangNiang/OpenMantis",
+		"directory": "packages/tts"
+	}
+}

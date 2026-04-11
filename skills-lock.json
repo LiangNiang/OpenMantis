@@ -1,0 +1,90 @@
+{
+  "version": 1,
+  "skills": {
+    "agent-browser": {
+      "source": "vercel-labs/agent-browser",
+      "sourceType": "github",
+      "computedHash": "fbf66fd85ccad0d42a287d346503782d7a97848e67595d7e8c840434d572ee81"
+    },
+    "ai-sdk": {
+      "source": "vercel/ai",
+      "sourceType": "github",
+      "computedHash": "27827bb6ca05cb6757953e507f46dc1c2bf44e48c1928eb3e49f2b675a168492"
+    },
+    "bilibili-analyzer": {
+      "source": "aidotnet/moyucode",
+      "sourceType": "github",
+      "computedHash": "80e79fd05967eed7b39062991bc0cc65868e4af53beb0a601352e81ef0de81a7"
+    },
+    "bilibili-cli": {
+      "source": "jackwener/bilibili-cli",
+      "sourceType": "github",
+      "computedHash": "e426cee138e312d1826505ba853151dfd0225813c53edeb69953c1600359a6cb"
+    },
+    "bilibili-subtitle": {
+      "source": "hamsterider-m/bilibili-subtitle",
+      "sourceType": "github",
+      "computedHash": "328b79f145e27ca9bdf524a0132c25143779c49db3a131c4b360394b4a3bee34"
+    },
+    "bun-development": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "computedHash": "d36e22683b65b676c4bd1503320dd7d3e3e3522593325666801e56465cbd817d"
+    },
+    "create-readme": {
+      "source": "github/awesome-copilot",
+      "sourceType": "github",
+      "computedHash": "d0ece1b2164ce1376e4ab6e98d6ac079df3a2a94f5f02224362b6a1ce2516ae9"
+    },
+    "docx": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "computedHash": "6962db07127ee540a56e4677f65576d0727668a1d67f7da8bc978f10791c2bfe"
+    },
+    "find-skills": {
+      "source": "vercel-labs/skills",
+      "sourceType": "github",
+      "computedHash": "d31e234f0c90694a670222cdd1dafa853e051d7066beda389f1097c22dadd461"
+    },
+    "image-generate": {
+      "source": "skills.volces.com",
+      "sourceType": "well-known",
+      "computedHash": "c4a16d34100532e0d428980f58b9762f100cd48a55e8f7645256b772aae8300c"
+    },
+    "image-generation": {
+      "source": "bytedance/deer-flow",
+      "sourceType": "github",
+      "computedHash": "dd2d450cdb2fcd39c5f07b8033208bd3676a62f8db3770df01f7ce04dbb61550"
+    },
+    "news-aggregator-skill": {
+      "source": "cclank/news-aggregator-skill",
+      "sourceType": "github",
+      "computedHash": "c347294bf4873523d8de9933d6e52272e2dbc84c2cf8c961f7ce21a5f2edd44c"
+    },
+    "ppt-generation": {
+      "source": "bytedance/deer-flow",
+      "sourceType": "github",
+      "computedHash": "1f95cca84b78975d6552da8e19c31fcb610ac80acc16f29c96c57bc6bc4d2173"
+    },
+    "shadcn": {
+      "source": "shadcn/ui",
+      "sourceType": "github",
+      "computedHash": "507f011a70e8b3ae242bdc0bb5b39fd91a1d4049a0f3c281991ccf84973d591c"
+    },
+    "skill-creator": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "computedHash": "b122f4d1e91aa1d83027e050b5b37c3156203ee85458d7b1360bc48167c9e02a"
+    },
+    "vercel-react-best-practices": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "computedHash": "43ca6c197f8ec13055079da7053232d477068b03ca443f9ac1bc819b95cdd432"
+    },
+    "xlsx": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "computedHash": "efd0c8011cf0677d8075cf93867ecec804f9a8754a777e1d2fdb46197e9c247f"
+    }
+  }
+}

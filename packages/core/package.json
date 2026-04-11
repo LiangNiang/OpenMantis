@@ -1,0 +1,53 @@
+{
+	"name": "@openmantis/core",
+	"private": true,
+	"type": "module",
+	"exports": {
+		"./config/store": "./src/config/store.ts",
+		"./agent/factory": "./src/agent/factory.ts",
+		"./agent/providers": "./src/agent/providers.ts",
+		"./gateway/gateway": "./src/gateway/gateway.ts",
+		"./gateway/channel-bindings": "./src/gateway/channel-bindings.ts",
+		"./gateway/route-store": "./src/gateway/route-store.ts",
+		"./channels/types": "./src/channels/types.ts",
+		"./commands/handlers": "./src/commands/handlers.ts",
+		"./commands/router": "./src/commands/router.ts",
+		"./commands/schedule": "./src/commands/schedule.ts",
+		"./commands/memory": "./src/commands/memory.ts",
+		"./commands/voice": "./src/commands/voice.ts",
+		"./commands/open-id": "./src/commands/open-id.ts",
+		"./commands/types": "./src/commands/types.ts",
+		"./context/gateway-context": "./src/context/gateway-context.ts",
+		"./context/scheduler-context": "./src/context/scheduler-context.ts",
+		"./tools/index": "./src/tools/index.ts"
+	},
+	"dependencies": {
+		"@openmantis/channel-wecom": "workspace:*",
+		"@openmantis/common": "workspace:*",
+		"@openmantis/scheduler": "workspace:*",
+		"@openmantis/tts": "workspace:*",
+		"@ai-sdk/anthropic": "^3.0.64",
+		"@ai-sdk/openai": "^3.0.48",
+		"@ai-sdk/openai-compatible": "^2.0.37",
+		"@ai-sdk/provider": "^3.0.8",
+		"@ai-sdk/provider-utils": "^3.0.14",
+		"@exalabs/ai-sdk": "^2.0.1",
+		"@tavily/ai-sdk": "^0.4.1",
+		"@tavily/core": "^0.6.4",
+		"ai": "^6.0.138",
+"fast-xml-parser": "^5.5.9",
+		"gray-matter": "^4.0.3",
+		"openai": "^6.33.0",
+		"zod": "^4.3.6",
+		"zod-to-json-schema": "^3.25.2"
+	},
+	"devDependencies": {
+		"@types/bun": "latest"
+	},
+	"license": "Apache-2.0",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/LiangNiang/OpenMantis",
+		"directory": "packages/core"
+	}
+}

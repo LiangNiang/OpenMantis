@@ -1,0 +1,25 @@
+{
+	"name": "@openmantis/web-server",
+	"private": true,
+	"type": "module",
+	"license": "Apache-2.0",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/LiangNiang/OpenMantis",
+		"directory": "packages/web-server"
+	},
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"dependencies": {
+		"@openmantis/common": "workspace:*",
+		"@openmantis/core": "workspace:*",
+		"@openmantis/scheduler": "workspace:*",
+		"hono": "^4.12.10",
+		"zod": "^4.3.6",
+		"ai": "^6.0.138"
+	},
+	"devDependencies": {
+		"@types/bun": "latest"
+	}
+}

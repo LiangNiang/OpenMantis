@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bun test:*)",
+      "Bash(bunx tsc:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ]
+  },
+  "enabledMcpjsonServers": [
+    "lark_open_doc_search"
+  ],
+  "enableAllProjectMcpServers": true
+}

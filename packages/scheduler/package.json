@@ -1,0 +1,22 @@
+{
+	"name": "@openmantis/scheduler",
+	"private": true,
+	"type": "module",
+	"license": "Apache-2.0",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/LiangNiang/OpenMantis",
+		"directory": "packages/scheduler"
+	},
+	"exports": {
+		"./service": "./src/service.ts",
+		"./store": "./src/store.ts"
+	},
+	"dependencies": {
+		"@openmantis/common": "workspace:*",
+		"cron-parser": "^5.5.0"
+	},
+	"devDependencies": {
+		"@types/bun": "latest"
+	}
+}
