@@ -7,6 +7,12 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square)](LICENSE)
 [![Bun](https://img.shields.io/badge/runtime-Bun-f9f1e1?style=flat-square&logo=bun)](https://bun.sh)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![AI SDK](https://img.shields.io/badge/AI_SDK-v6-black?style=flat-square&logo=vercel&logoColor=white)](https://ai-sdk.dev)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](https://github.com/LiangNiang/OpenMantis/pulls)
+
+[![Feishu](https://img.shields.io/badge/飞书-Feishu-4f46e5?style=flat-square&logo=bytedance&logoColor=white)](packages/channel-feishu)
+[![WeCom](https://img.shields.io/badge/企业微信-WeCom-07c160?style=flat-square&logo=wechat&logoColor=white)](packages/channel-wecom)
+[![QQ](https://img.shields.io/badge/QQ_(WIP)-12b7f5?style=flat-square&logo=tencentqq&logoColor=white)](packages/channel-qq)
 
 Connect multiple LLM providers to multiple communication channels with composable tools, scheduling, browser automation, and more — all from a single deployment.
 
@@ -220,6 +226,8 @@ Tasks execute through the full agent pipeline and results are delivered to the o
 - [ ] **Multi-Agent Orchestration** — Support Multi-Agent and Sub-Agent collaboration for complex task decomposition and parallel execution
 - [ ] **Memory System Redesign** — Rearchitect storage and retrieval for better accuracy and scalability
 - [ ] **Telegram Channel** — Add Telegram Bot adapter
+
+> **Note:** The QQ channel is not yet well supported. [PRs welcome!](https://github.com/LiangNiang/OpenMantis/pulls)
 
 ## Debug Flags
 

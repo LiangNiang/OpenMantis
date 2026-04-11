@@ -40,6 +40,18 @@ Debug environment variables: `LOG_LEVEL=debug`, `DEBUG_PROMPT=true`.
 - Run `bun run check` and `bun run typecheck` before committing
 - `noNonNullAssertion` and `noExplicitAny` are intentionally disabled
 
+## Git Commit Convention
+
+使用 [Angular Commit Message Convention](https://github.com/angular/angular/blob/main/CONTRIBUTING.md#-commit-message-format)：
+
+```
+<type>(<scope>): <short summary>
+```
+
+**type:** `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`
+
+**scope:** 可选，通常为包名或模块名（如 `core`, `feishu`, `wecom`, `scheduler`, `web`, `readme` 等）
+
 ## Architecture
 
 Bun monorepo with workspaces under `packages/`:
