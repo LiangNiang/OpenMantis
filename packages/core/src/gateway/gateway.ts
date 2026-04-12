@@ -334,6 +334,7 @@ export class Gateway {
 			channelType: incoming.channelType,
 			channelId: incoming.channelId,
 			routeId: route.id,
+			metadata: incoming.metadata,
 		});
 
 		logger.debug(`[gateway] starting stream, messages: ${agentMessages.length}`);

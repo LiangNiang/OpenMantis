@@ -1,6 +1,6 @@
 // src/scheduler/service.ts
 
-import type { GatewayResponse, IncomingMessage } from "@openmantis/common/types/channels";
+import { MESSAGE_SOURCE, type GatewayResponse, type IncomingMessage } from "@openmantis/common/types/channels";
 import type { Schedule, ScheduledTask } from "@openmantis/common/types/scheduler";
 import { createLogger } from "@openmantis/common/logger";
 import { calcInitialNextExecution, calcNextExecution, realignToFuture } from "./next-execution";
@@ -238,6 +238,7 @@ export class SchedulerService {
 				channelId: task.originChannelId,
 				routeId: freshRouteId,
 				content: task.prompt,
+				metadata: { source: MESSAGE_SOURCE.SCHEDULER },
 			};
 
 			// Execute through gateway (full agent pipeline)

@@ -33,6 +33,7 @@ export interface ChannelContext {
 	channelId: string;
 	routeId?: string;
 	model?: LanguageModelV3;
+	isScheduledExecution?: boolean;
 }
 
 export interface ChannelToolResult {
@@ -54,7 +55,7 @@ const ALL_TOOL_GROUPS = [
 	"skills",
 	"tavily",
 	"exa",
-"schedule",
+	"schedule",
 	"rss",
 	"whisper",
 	"tts",
@@ -110,11 +111,15 @@ export async function resolveTools(
 				Object.assign(tools, createExaTools(config.exa.apiKey));
 				break;
 			}
-case "rss": {
+			case "rss": {
 				Object.assign(tools, createRssTools());
 				break;
 			}
 			case "schedule": {
+				if (channelCtx?.isScheduledExecution) {
+					logger.debug("[resolveTools] skipping schedule tools for scheduled execution");
+					break;
+				}
 				const scheduler = getSchedulerService();
 				if (!scheduler) {
 					logger.warn("[resolveTools] schedule tool requires scheduler context");

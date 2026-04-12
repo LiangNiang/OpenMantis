@@ -55,7 +55,14 @@ function createCreateTool(
 			"根据用户的自然语言描述选择合适的模式和参数。\n" +
 			contextInfo,
 		inputSchema: z.object({
-			prompt: z.string().describe("每次执行时应该做什么"),
+			prompt: z
+				.string()
+				.describe(
+					"任务触发时发送给 agent 的执行指令。" +
+						"这段文本会在触发时作为独立的用户消息被执行，因此必须是自包含的、可直接执行的指令，" +
+						"不得包含调度意图（如「提醒我」「定时」「每天」等），否则会导致重复创建任务。" +
+						"正确示例：用户要求「每天早上提醒我喝水」→ prompt 写「现在是喝水时间，请喝一杯水。」",
+				),
 			scheduleType: z
 				.enum(["every", "cron", "at"])
 				.describe("调度模式: every=固定间隔, cron=cron表达式, at=一次性定时"),

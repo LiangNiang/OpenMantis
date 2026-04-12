@@ -1,3 +1,8 @@
+/** Well-known values for IncomingMessage.metadata.source */
+export const MESSAGE_SOURCE = {
+	SCHEDULER: "scheduler",
+} as const;
+
 export interface FileAttachment {
 	path: string;
 	fileName: string;

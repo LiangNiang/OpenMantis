@@ -27,7 +27,7 @@ export async function createLanguageModel(
 			return bytedance.chatModel(model);
 		}
 
-case "anthropic": {
+		case "anthropic": {
 			const anthropic = createAnthropic({
 				apiKey: providerConfig.apiKey,
 				baseURL: providerConfig.baseUrl || undefined,

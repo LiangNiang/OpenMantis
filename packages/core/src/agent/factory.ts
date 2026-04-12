@@ -4,6 +4,7 @@ import {
 	resolveProvider,
 } from "@openmantis/common/config/schema";
 import { createLogger } from "@openmantis/common/logger";
+import { MESSAGE_SOURCE } from "@openmantis/common/types/channels";
 import { type ModelMessage, stepCountIs, type Tool, ToolLoopAgent, wrapLanguageModel } from "ai";
 import { type ChannelToolProviders, resolveTools } from "../tools";
 import { memoryStore } from "../tools/memory";
@@ -21,6 +22,7 @@ export interface CreateAgentOptions {
 	channelType?: string;
 	channelId?: string;
 	routeId?: string;
+	metadata?: Record<string, unknown>;
 }
 
 export interface CreateAgentResult {
@@ -50,6 +52,8 @@ export class AgentFactory {
 			});
 		}
 
+		const isScheduledExecution = options?.metadata?.source === MESSAGE_SOURCE.SCHEDULER;
+
 		const {
 			tools: rawTools,
 			skillInstructions,
@@ -63,6 +67,7 @@ export class AgentFactory {
 						channelId: options.channelId,
 						routeId: options.routeId,
 						model,
+						isScheduledExecution,
 					}
 				: undefined,
 			this.channelToolProviders,
