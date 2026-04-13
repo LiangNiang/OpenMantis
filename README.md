@@ -12,7 +12,7 @@
 
 [![Feishu](https://img.shields.io/badge/飞书-Feishu-4f46e5?style=flat-square&logo=bytedance&logoColor=white)](packages/channel-feishu)
 [![WeCom](https://img.shields.io/badge/企业微信-WeCom-07c160?style=flat-square&logo=wechat&logoColor=white)](packages/channel-wecom)
-[![QQ](https://img.shields.io/badge/QQ_(WIP)-12b7f5?style=flat-square&logo=tencentqq&logoColor=white)](packages/channel-qq)
+[![QQ](https://img.shields.io/badge/QQ-12b7f5?style=flat-square&logo=tencentqq&logoColor=white)](packages/channel-qq)
 
 将多个 LLM 供应商连接到多个通讯平台，配合可组合的工具、定时任务、浏览器自动化、记忆系统、定时任务等能力 —— 一次部署，全部搞定。
 
@@ -227,7 +227,7 @@ google-chrome --remote-debugging-port=9222
 - [ ] **记忆系统重构** — 重新设计存储与检索架构，提升长期记忆的准确性与可扩展性
 - [ ] **Telegram 渠道** — 新增 Telegram Bot 适配器
 
-> **Note:** QQ 渠道尚未得到很好的适配支持，欢迎提交 [PR](https://github.com/LiangNiang/OpenMantis/pulls) 帮助完善！
+> 欢迎提交 [PR](https://github.com/LiangNiang/OpenMantis/pulls) 帮助完善！
 
 ## 调试参数
 

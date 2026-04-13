@@ -12,7 +12,7 @@
 
 [![Feishu](https://img.shields.io/badge/飞书-Feishu-4f46e5?style=flat-square&logo=bytedance&logoColor=white)](packages/channel-feishu)
 [![WeCom](https://img.shields.io/badge/企业微信-WeCom-07c160?style=flat-square&logo=wechat&logoColor=white)](packages/channel-wecom)
-[![QQ](https://img.shields.io/badge/QQ_(WIP)-12b7f5?style=flat-square&logo=tencentqq&logoColor=white)](packages/channel-qq)
+[![QQ](https://img.shields.io/badge/QQ-12b7f5?style=flat-square&logo=tencentqq&logoColor=white)](packages/channel-qq)
 
 Connect multiple LLM providers to multiple communication channels with composable tools, scheduling, browser automation, and more — all from a single deployment.
 
@@ -227,7 +227,7 @@ Tasks execute through the full agent pipeline and results are delivered to the o
 - [ ] **Memory System Redesign** — Rearchitect storage and retrieval for better accuracy and scalability
 - [ ] **Telegram Channel** — Add Telegram Bot adapter
 
-> **Note:** The QQ channel is not yet well supported. [PRs welcome!](https://github.com/LiangNiang/OpenMantis/pulls)
+> [PRs welcome!](https://github.com/LiangNiang/OpenMantis/pulls)
 
 ## Debug Flags
 
