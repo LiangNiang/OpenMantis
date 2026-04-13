@@ -5,6 +5,7 @@ export interface ChannelContext {
 	channelId: string;
 	routeId?: string;
 	model?: unknown; // LanguageModelV3 in core; contracts stays SDK-agnostic
+	metadata?: Record<string, unknown>;
 }
 
 export interface ChannelToolResult {

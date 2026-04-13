@@ -2,6 +2,7 @@ import { createLogger } from "@openmantis/common/logger";
 
 const logger = createLogger("channel-qq");
 import type {
+	FileHashes,
 	QQConfig,
 	QQGatewayInfo,
 	QQMediaResult,
@@ -9,6 +10,7 @@ import type {
 	QQSendMessageParams,
 	StreamMessageRequest,
 	StreamMessageResult,
+	UploadPrepareResponse,
 } from "./types";
 
 const TOKEN_URL = "https://bots.qq.com/app/getAppAccessToken";
@@ -131,6 +133,27 @@ export class QQApi {
 		return this.request<QQMessageResult>("POST", `/v2/groups/${groupOpenid}/messages`, params);
 	}
 
+	/**
+	 * 发送 C2C "正在输入" 状态通知（仅私聊有效）。
+	 * msg_type=6, input_notify.input_type=1 表示文字输入中。
+	 */
+	async sendC2CInputNotify(
+		openid: string,
+		msgId: string,
+		msgSeq: number,
+		inputSecond = 60,
+	): Promise<void> {
+		await this.request<unknown>("POST", `/v2/users/${openid}/messages`, {
+			msg_type: 6,
+			input_notify: {
+				input_type: 1,
+				input_second: inputSecond,
+			},
+			msg_id: msgId,
+			msg_seq: msgSeq,
+		});
+	}
+
 	async sendC2CStreamMessage(
 		openid: string,
 		req: StreamMessageRequest,
@@ -173,6 +196,84 @@ export class QQApi {
 			url: options.url ?? "",
 			file_data: options.fileData,
 			srv_send_msg: srvSendMsg,
+		});
+	}
+
+	// ---- 分片上传 API ----
+
+	async c2cUploadPrepare(
+		openid: string,
+		fileType: number,
+		fileName: string,
+		fileSize: number,
+		hashes: FileHashes,
+	): Promise<UploadPrepareResponse> {
+		return this.request<UploadPrepareResponse>("POST", `/v2/users/${openid}/upload_prepare`, {
+			file_type: fileType,
+			file_name: fileName,
+			file_size: fileSize,
+			...hashes,
+		});
+	}
+
+	async c2cUploadPartFinish(
+		openid: string,
+		uploadId: string,
+		partIndex: number,
+		blockSize: number,
+		md5: string,
+	): Promise<void> {
+		await this.request<unknown>("POST", `/v2/users/${openid}/upload_part_finish`, {
+			upload_id: uploadId,
+			part_index: partIndex,
+			block_size: blockSize,
+			md5,
+		});
+	}
+
+	async c2cCompleteUpload(openid: string, uploadId: string): Promise<QQMediaResult> {
+		return this.request<QQMediaResult>("POST", `/v2/users/${openid}/files`, {
+			upload_id: uploadId,
+		});
+	}
+
+	async groupUploadPrepare(
+		groupOpenid: string,
+		fileType: number,
+		fileName: string,
+		fileSize: number,
+		hashes: FileHashes,
+	): Promise<UploadPrepareResponse> {
+		return this.request<UploadPrepareResponse>(
+			"POST",
+			`/v2/groups/${groupOpenid}/upload_prepare`,
+			{
+				file_type: fileType,
+				file_name: fileName,
+				file_size: fileSize,
+				...hashes,
+			},
+		);
+	}
+
+	async groupUploadPartFinish(
+		groupOpenid: string,
+		uploadId: string,
+		partIndex: number,
+		blockSize: number,
+		md5: string,
+	): Promise<void> {
+		await this.request<unknown>("POST", `/v2/groups/${groupOpenid}/upload_part_finish`, {
+			upload_id: uploadId,
+			part_index: partIndex,
+			block_size: blockSize,
+			md5,
+		});
+	}
+
+	async groupCompleteUpload(groupOpenid: string, uploadId: string): Promise<QQMediaResult> {
+		return this.request<QQMediaResult>("POST", `/v2/groups/${groupOpenid}/files`, {
+			upload_id: uploadId,
 		});
 	}
 }

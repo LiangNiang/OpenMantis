@@ -251,7 +251,14 @@ export class Gateway {
 
 		await Promise.all(
 			this.channels.map((ch) =>
-				ch.run().catch((err) => logger.error(`Channel ${ch.type} error:`, err)),
+				ch
+					.run()
+					.catch((err) =>
+						logger.error(
+							`Channel ${ch.type} error:`,
+							err instanceof Error ? err.stack || err.message : err,
+						),
+					),
 			),
 		);
 	}

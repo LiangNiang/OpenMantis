@@ -42,9 +42,6 @@ const THROTTLE = {
 /** 安全超时（5 分钟） */
 const TIMEOUT_MS = 5 * 60 * 1000;
 
-/** 工具历史最大保留条数 */
-const MAX_TOOL_HISTORY = 3;
-
 /** 流式状态机阶段 */
 type Phase = "idle" | "streaming" | "completed" | "aborted";
 
@@ -184,7 +181,6 @@ export async function streamQQReply(
 	// ---- 状态 ----
 	let phase: Phase = "idle";
 	let textContent = "";
-	const toolHistory: string[] = [];
 	let streamMsgId: string | null = null;
 	let chunkIndex = 0;
 	/** 同一流式会话内所有 chunk 共享同一个 msg_seq（参考 QQ 流式 API 协议） */
@@ -215,10 +211,11 @@ export async function streamQQReply(
 	}
 
 	// ---- 构建展示内容 ----
+	// QQ 流式 API replace 模式要求内容只能追加，不能修改已发送的前缀。
+	// 因此不能在文本后附加会变化的工具状态块（文本增长会改变分隔符前的内容）。
 
 	function buildDisplay(): string {
-		const statusBlock = toolHistory.length > 0 ? `\n\n---\n${toolHistory.join("\n")}` : "";
-		return (textContent || "...") + statusBlock;
+		return textContent || "...";
 	}
 
 	// ---- 发送流式分片 ----
@@ -309,18 +306,9 @@ export async function streamQQReply(
 					textContent += "\n\n⏹ 已停止";
 					break;
 				case "tool-start":
-					toolHistory.push(`⚙️ ${event.toolName}...`);
-					if (toolHistory.length > MAX_TOOL_HISTORY) toolHistory.shift();
+				case "tool-end":
+					// 工具状态不纳入流式内容（QQ replace 模式要求只能追加，不能修改前缀）
 					break;
-				case "tool-end": {
-					const idx = toolHistory.findLastIndex(
-						(s) => s.includes(event.toolName) && s.endsWith("..."),
-					);
-					if (idx >= 0) {
-						toolHistory[idx] = `✓ ${event.toolName}`;
-					}
-					break;
-				}
 				default:
 					continue;
 			}
@@ -371,8 +359,8 @@ export async function streamQQReply(
 		logger.info("[qq:stream] fallback: sending as regular message");
 		try {
 			await api.sendC2CMessage(openid, {
-				msg_type: 0,
-				content: textContent || "(empty response)",
+				msg_type: 2,
+				markdown: { content: textContent || "(empty response)" },
 				msg_id: msgId,
 				msg_seq: msgSeqCounter++,
 			});

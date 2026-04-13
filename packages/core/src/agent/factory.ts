@@ -68,6 +68,7 @@ export class AgentFactory {
 						routeId: options.routeId,
 						model,
 						isScheduledExecution,
+						metadata: options.metadata,
 					}
 				: undefined,
 			this.channelToolProviders,

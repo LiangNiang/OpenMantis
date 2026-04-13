@@ -44,6 +44,7 @@ export interface QQGatewayInfo {
 export interface QQSendMessageParams {
 	msg_type: 0 | 2 | 3 | 4 | 7;
 	content?: string;
+	markdown?: { content: string };
 	media?: { file_info: string };
 	msg_id?: string;
 	msg_seq?: number;
@@ -58,6 +59,33 @@ export interface QQMediaResult {
 	file_uuid: string;
 	file_info: string;
 	ttl: number;
+}
+
+// ============ 分片上传 API ============
+
+/** 分片信息 */
+export interface UploadPart {
+	/** 分片索引（从 1 开始） */
+	index: number;
+	/** 预签名上传链接（COS） */
+	presigned_url: string;
+}
+
+/** upload_prepare 响应 */
+export interface UploadPrepareResponse {
+	upload_id: string;
+	block_size: number;
+	parts: UploadPart[];
+	concurrency?: number;
+	/** partFinish 特定错误码的重试超时（秒） */
+	retry_timeout?: number;
+}
+
+/** 文件哈希信息 */
+export interface FileHashes {
+	md5: string;
+	sha1: string;
+	md5_10m: string;
 }
 
 // ============ 流式消息 API ============

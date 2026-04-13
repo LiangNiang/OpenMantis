@@ -34,6 +34,7 @@ export interface ChannelContext {
 	routeId?: string;
 	model?: LanguageModelV3;
 	isScheduledExecution?: boolean;
+	metadata?: Record<string, unknown>;
 }
 
 export interface ChannelToolResult {

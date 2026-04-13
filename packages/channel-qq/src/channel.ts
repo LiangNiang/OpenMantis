@@ -5,6 +5,7 @@ import { QQApi } from "./api";
 import { QQGateway } from "./gateway";
 import { buildQQChannelId, buildQQRouteId, parseQQMessage, stripQQMention } from "./parser";
 import { streamQQReply, type StreamEvent } from "./stream";
+import { TypingKeepAlive } from "./typing";
 import type { QQConfig } from "./types";
 
 const logger = createLogger("channel-qq");
@@ -134,6 +135,7 @@ interface AgentMessageContext {
 	routeId: string;
 	content: string;
 	files?: FileAttachment[];
+	metadata?: Record<string, unknown>;
 	onMessage: OnMessageCallback<StreamEvent>;
 	streamReply: (stream: AsyncIterable<StreamEvent>) => Promise<unknown>;
 	fallbackReply: (text: string) => Promise<void>;
@@ -149,7 +151,7 @@ function handleAgentMessage(ctx: AgentMessageContext): void {
 			routeId: ctx.routeId,
 			content: ctx.content,
 			files: ctx.files?.length ? ctx.files : undefined,
-			metadata: { receivedAt: Date.now() },
+			metadata: { receivedAt: Date.now(), ...ctx.metadata },
 		});
 
 		try {
@@ -237,14 +239,14 @@ export class QQChannel {
 			if (channelId.startsWith("qq-c2c-")) {
 				const openid = channelId.slice("qq-c2c-".length);
 				await this.api.sendC2CMessage(openid, {
-					msg_type: 0,
-					content,
+					msg_type: 2,
+					markdown: { content },
 				});
 			} else if (channelId.startsWith("qq-group-")) {
 				const groupOpenid = channelId.slice("qq-group-".length);
 				await this.api.sendGroupMessage(groupOpenid, {
-					msg_type: 0,
-					content,
+					msg_type: 2,
+					markdown: { content },
 				});
 			}
 		} catch (err) {
@@ -342,12 +344,23 @@ export class QQChannel {
 		content: string,
 		files?: FileAttachment[],
 	): void {
+		// C2C 私聊启动"正在输入"状态指示器
+		// typing 与 replyText 共享 msgSeqCounter — QQ 不要求严格连续，仅用于去重
+		const typing =
+			!isGroup
+				? new TypingKeepAlive(this.api, targetId, msgId, () => this.msgSeqCounter++)
+				: null;
+		typing?.start().catch(() => {});
+
+		const stopTyping = () => typing?.stop();
+
 		handleAgentMessage({
 			channelType: this.type,
 			channelId,
 			routeId,
 			content,
 			files,
+			metadata: { qqMsgId: msgId },
 			onMessage: this.onMessage!,
 			streamReply: isGroup
 				? async (stream) => {
@@ -358,9 +371,19 @@ export class QQChannel {
 						}
 						await this.replyText(true, targetId, msgId, text || "(empty response)");
 					}
-				: (stream) => streamQQReply(this.api, targetId, msgId, stream),
-			fallbackReply: (text) => this.replyText(isGroup, targetId, msgId, text),
-			errorReply: (text) => this.replyText(isGroup, targetId, msgId, text),
+				: async (stream) => {
+						// 收到首个流式分片后停止 typing（流式消息本身就有 UI 反馈）
+						stopTyping();
+						return streamQQReply(this.api, targetId, msgId, stream);
+					},
+			fallbackReply: async (text) => {
+				stopTyping();
+				await this.replyText(isGroup, targetId, msgId, text);
+			},
+			errorReply: async (text) => {
+				stopTyping();
+				await this.replyText(isGroup, targetId, msgId, text);
+			},
 			logPrefix: "[qq]",
 		});
 	}
@@ -374,20 +397,16 @@ export class QQChannel {
 		text: string,
 	): Promise<void> {
 		const msgSeq = this.msgSeqCounter++;
+		const params = {
+			msg_type: 2 as const,
+			markdown: { content: text },
+			msg_id: msgId,
+			msg_seq: msgSeq,
+		};
 		if (isGroup) {
-			await this.api.sendGroupMessage(targetId, {
-				msg_type: 0,
-				content: text,
-				msg_id: msgId,
-				msg_seq: msgSeq,
-			});
+			await this.api.sendGroupMessage(targetId, params);
 		} else {
-			await this.api.sendC2CMessage(targetId, {
-				msg_type: 0,
-				content: text,
-				msg_id: msgId,
-				msg_seq: msgSeq,
-			});
+			await this.api.sendC2CMessage(targetId, params);
 		}
 	}
 }
