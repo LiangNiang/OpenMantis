@@ -162,7 +162,7 @@ async function main() {
 	const scheduler = new SchedulerService(gateway, scheduleStore);
 	setSchedulerService(scheduler);
 
-	await startWebServer({ configStore, gateway, scheduler });
+	const webServer = await startWebServer({ configStore, gateway, scheduler });
 	await Bun.write(PID_FILE, String(process.pid));
 
 	{
@@ -213,6 +213,7 @@ async function main() {
 	const shutdown = async () => {
 		await scheduler.stop();
 		await gateway.stop();
+		webServer.stop();
 		if (config.browser?.enabled && !isBrowserCdpActive(config)) {
 			const bin = config.browser.binPath ?? "agent-browser";
 			try {

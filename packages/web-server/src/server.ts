@@ -1,4 +1,6 @@
 import { join } from "node:path";
+import type { Server } from "bun";
+type WebServer = Server<unknown>;
 import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
 import { createLogger } from "@openmantis/common/logger";
@@ -38,7 +40,7 @@ export function createWebServer(ctx: WebServerContext) {
 	return app;
 }
 
-export async function startWebServer(ctx: WebServerContext): Promise<void> {
+export async function startWebServer(ctx: WebServerContext): Promise<WebServer> {
 	const config = ctx.configStore.get();
 	const host = config.web?.host ?? "127.0.0.1";
 	const port = config.web?.port ?? 7777;
@@ -53,7 +55,7 @@ export async function startWebServer(ctx: WebServerContext): Promise<void> {
 
 	const app = createWebServer(ctx);
 
-	Bun.serve({
+	const server = Bun.serve({
 		fetch: app.fetch,
 		hostname: host,
 		port,
@@ -67,4 +69,6 @@ export async function startWebServer(ctx: WebServerContext): Promise<void> {
 	} else {
 		logger.info(`[web] Config dashboard: ${url}${tokenSuffix}`);
 	}
+
+	return server;
 }
