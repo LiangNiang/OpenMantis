@@ -2,6 +2,9 @@ import { useCallback, useMemo, useState } from "react";
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { RestartBanner } from "@/components/restart-banner";
+import { RestartConfirmDialog } from "@/components/restart-confirm-dialog";
+import { RestartOverlay } from "@/components/restart-overlay";
+import { useRestart } from "@/hooks/use-restart";
 import type { ProviderEntry } from "@/components/provider-form";
 import { HAS_CONFIG_TOOLS, type ToolsFormValues } from "@/components/tools-form";
 import { Button } from "@/components/ui/button";
@@ -131,6 +134,8 @@ function DashboardLayoutInner({ config, error, updateConfig, resetConfig }: Inne
 	const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
 	const [saveError, setSaveError] = useState<string | null>(null);
 	const [showResetConfirm, setShowResetConfirm] = useState(false);
+	const [showRestartConfirm, setShowRestartConfirm] = useState(false);
+	const { status: restartStatus, triggerRestart } = useRestart();
 
 	const sections = useMemo(
 		() =>
@@ -386,7 +391,29 @@ whisper: config.whisper,
 					</NavLink>
 				</nav>
 				<Separator className="opacity-40" />
-				<div className="p-4">
+				<div className="p-4 flex flex-col gap-2">
+					<button
+						type="button"
+						onClick={() => setShowRestartConfirm(true)}
+						disabled={restartStatus !== "idle"}
+						className="text-xs text-muted-foreground hover:text-primary transition-colors duration-200 flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+					>
+						<svg className="size-3.5" viewBox="0 0 16 16" fill="none">
+							<path
+								d="M2 8a6 6 0 1 1 12 0 6 6 0 0 1-12 0Z"
+								stroke="currentColor"
+								strokeWidth="1.5"
+							/>
+							<path
+								d="M8 5v3l2 1"
+								stroke="currentColor"
+								strokeWidth="1.5"
+								strokeLinecap="round"
+								strokeLinejoin="round"
+							/>
+						</svg>
+						{restartStatus === "idle" ? t("common.restart") : t("common.restarting")}
+					</button>
 					<button
 						type="button"
 						onClick={() => navigate("/wizard")}
@@ -485,6 +512,12 @@ whisper: config.whisper,
 					</DialogFooter>
 				</DialogContent>
 			</Dialog>
+			<RestartConfirmDialog
+				open={showRestartConfirm}
+				onOpenChange={setShowRestartConfirm}
+				onConfirm={triggerRestart}
+			/>
+			<RestartOverlay status={restartStatus} />
 			</div>
 		</div>
 	);
