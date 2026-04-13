@@ -152,9 +152,9 @@ function createSkillLoaderTool(skills: Skill[]): Tool {
 		"After loading a skill, use the bash tool to run its scripts using absolute paths.",
 	);
 	descLines.push(
-		"IMPORTANT: ALL output files MUST end up in `.openmantis/workspace/`. " +
+		`IMPORTANT: ALL output files MUST end up in \`${WORKSPACE_DIR}/\`. ` +
 			"If the script supports an output directory flag, use it. " +
-			"If not, run the script then MOVE the output files to `.openmantis/workspace/`. " +
+			`If not, run the script then MOVE the output files to \`${WORKSPACE_DIR}/\`. ` +
 			"NEVER leave output files inside the skill directory.",
 	);
 
