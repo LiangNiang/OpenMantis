@@ -41,7 +41,7 @@ import { SchedulerService } from "@openmantis/scheduler/service";
 import { ScheduleStore } from "@openmantis/scheduler/store";
 import { startWebServer } from "@openmantis/web-server";
 
-async function main() {
+export async function main() {
 	const configStore = new ConfigStore(CONFIG_FILE);
 	await configStore.load();
 
@@ -241,8 +241,3 @@ async function main() {
 		await gateway.start();
 	}
 }
-
-main().catch((err) => {
-	logger.error("Failed to start OpenMantis:", err);
-	process.exit(1);
-});
