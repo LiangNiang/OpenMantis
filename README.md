@@ -12,7 +12,7 @@
 
 [![Feishu](https://img.shields.io/badge/飞书-Feishu-4f46e5?style=flat-square&logo=bytedance&logoColor=white)](packages/channel-feishu)
 [![WeCom](https://img.shields.io/badge/企业微信-WeCom-07c160?style=flat-square&logo=wechat&logoColor=white)](packages/channel-wecom)
-[![QQ](https://img.shields.io/badge/QQ-12b7f5?style=flat-square&logo=tencentqq&logoColor=white)](packages/channel-qq)
+[![QQ](https://img.shields.io/badge/QQ-12b7f5?style=flat-square&logo=qq&logoColor=white)](packages/channel-qq)
 
 将多个 LLM 供应商连接到多个通讯平台，配合可组合的工具、定时任务、浏览器自动化、记忆系统、定时任务等能力 —— 一次部署，全部搞定。
 
