@@ -1,32 +1,35 @@
 import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
+import { homedir } from "node:os";
 
-export const OPENMANTIS_DIR = ".openmantis";
+export const OPENMANTIS_HOME =
+	process.env.OPENMANTIS_DATA_DIR || join(homedir(), ".openmantis");
 
-export const LOG_FILE = `${OPENMANTIS_DIR}/openmantis.log`;
-export const PID_FILE = `${OPENMANTIS_DIR}/openmantis.pid`;
-export const CONFIG_FILE = `${OPENMANTIS_DIR}/config.json`;
-export const ROUTES_DIR = `${OPENMANTIS_DIR}/routes`;
-export const SCHEDULES_DIR = `${OPENMANTIS_DIR}/schedules`;
-export const CHANNEL_BINDINGS_FILE = `${OPENMANTIS_DIR}/channel-bindings.json`;
-export const TTS_DIR = `${OPENMANTIS_DIR}/tts`;
-export const UPLOADS_DIR = `${OPENMANTIS_DIR}/uploads`;
-export const TMP_DIR = `${OPENMANTIS_DIR}/tmp`;
-export const MEMORIES_DIR = `${OPENMANTIS_DIR}/memories`;
-export const WORKSPACE_DIR = `${OPENMANTIS_DIR}/workspace`;
+export const LOG_FILE = join(OPENMANTIS_HOME, "openmantis.log");
+export const PID_FILE = join(OPENMANTIS_HOME, "openmantis.pid");
+export const CONFIG_FILE = join(OPENMANTIS_HOME, "config.json");
+export const ROUTES_DIR = join(OPENMANTIS_HOME, "routes");
+export const SCHEDULES_DIR = join(OPENMANTIS_HOME, "schedules");
+export const CHANNEL_BINDINGS_FILE = join(OPENMANTIS_HOME, "channel-bindings.json");
+export const TTS_DIR = join(OPENMANTIS_HOME, "tts");
+export const UPLOADS_DIR = join(OPENMANTIS_HOME, "uploads");
+export const TMP_DIR = join(OPENMANTIS_HOME, "tmp");
+export const MEMORIES_DIR = join(OPENMANTIS_HOME, "memories");
+export const WORKSPACE_DIR = join(OPENMANTIS_HOME, "workspace");
+export const SKILLS_DIR = join(OPENMANTIS_HOME, "skills");
 
-export const BROWSER_PROFILES_DIR = `${OPENMANTIS_DIR}/browser-profiles`;
+export const BROWSER_PROFILES_DIR = join(OPENMANTIS_HOME, "browser-profiles");
 
 export function browserProfileDir(routeId: string): string {
-	return `${BROWSER_PROFILES_DIR}/${routeId}`;
+	return join(BROWSER_PROFILES_DIR, routeId);
 }
 
 export function routeFile(id: string): string {
-	return `${ROUTES_DIR}/${id}.json`;
+	return join(ROUTES_DIR, `${id}.json`);
 }
 
 export function scheduleFile(id: string): string {
-	return `${SCHEDULES_DIR}/${id}.json`;
+	return join(SCHEDULES_DIR, `${id}.json`);
 }
 
 /** Ensure the directory containing `path` exists (recursive). */
