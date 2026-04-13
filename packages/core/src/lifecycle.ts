@@ -38,7 +38,7 @@ export async function restartProcess(): Promise<void> {
 
 	try {
 		const args = process.argv.slice(1);
-		const child = Bun.spawn(["bun", ...args], {
+		const child = Bun.spawn([process.execPath, ...args], {
 			stdio: ["inherit", "inherit", "inherit"],
 			env: process.env,
 		});
