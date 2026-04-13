@@ -134,7 +134,7 @@ async function main() {
 	const target = targetFlag !== -1 ? args[targetFlag + 1] : undefined;
 	const all = args.includes("--all");
 
-	await rm("dist/bin", { recursive: true, force: true });
+	await rm("dist", { recursive: true, force: true });
 	await buildWeb();
 	await generateEmbedModules();
 	await mkdir("dist/bin", { recursive: true });
