@@ -3,7 +3,12 @@ import { QQChannel, qqToolsProvider } from "@openmantis/channel-qq";
 import { WeComChannel, wecomToolsProvider } from "@openmantis/channel-wecom";
 import { isBrowserCdpActive } from "@openmantis/common/config/schema";
 import { createLogger } from "@openmantis/common/logger";
-import { CHANNEL_BINDINGS_FILE, CONFIG_FILE, SCHEDULES_DIR } from "@openmantis/common/paths";
+import {
+	CHANNEL_BINDINGS_FILE,
+	CONFIG_FILE,
+	PID_FILE,
+	SCHEDULES_DIR,
+} from "@openmantis/common/paths";
 import type { ChannelAdapter } from "@openmantis/core/channels/types";
 import {
 	botOpenIdCommand,
@@ -27,6 +32,7 @@ import { setGateway } from "@openmantis/core/context/gateway-context";
 import { setSchedulerService } from "@openmantis/core/context/scheduler-context";
 import { ChannelBindings } from "@openmantis/core/gateway/channel-bindings";
 import { Gateway } from "@openmantis/core/gateway/gateway";
+import { registerRestartDeps } from "@openmantis/core/lifecycle";
 import type { ChannelToolProviders } from "@openmantis/core/tools/index";
 
 const logger = createLogger("core");
@@ -157,6 +163,7 @@ async function main() {
 	setSchedulerService(scheduler);
 
 	await startWebServer({ configStore, gateway, scheduler });
+	await Bun.write(PID_FILE, String(process.pid));
 
 	{
 		const host = config.web?.host ?? "127.0.0.1";
@@ -215,11 +222,18 @@ async function main() {
 				logger.warn("[browser] failed to close agent-browser daemon:", err);
 			}
 		}
-		process.exit(0);
 	};
 
-	process.on("SIGINT", shutdown);
-	process.on("SIGTERM", shutdown);
+	registerRestartDeps({ shutdown });
+
+	process.on("SIGINT", async () => {
+		await shutdown();
+		process.exit(0);
+	});
+	process.on("SIGTERM", async () => {
+		await shutdown();
+		process.exit(0);
+	});
 
 	await scheduler.start();
 	if (channels.length > 0) {

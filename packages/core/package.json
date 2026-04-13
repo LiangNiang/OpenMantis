@@ -19,6 +19,7 @@
 		"./commands/types": "./src/commands/types.ts",
 		"./context/gateway-context": "./src/context/gateway-context.ts",
 		"./context/scheduler-context": "./src/context/scheduler-context.ts",
+		"./lifecycle": "./src/lifecycle.ts",
 		"./tools/index": "./src/tools/index.ts"
 	},
 	"dependencies": {
