@@ -6,6 +6,7 @@ import { createLogger } from "@openmantis/common/logger";
 const logger = createLogger("web-server");
 import { configRoutes } from "./api/config";
 import { logsRoutes } from "./api/logs";
+import { restartRoutes } from "./api/restart";
 import { statusRoutes } from "./api/status";
 import { authMiddleware } from "./middleware/auth";
 import type { WebServerContext } from "./types";
@@ -18,6 +19,7 @@ export function createWebServer(ctx: WebServerContext) {
 	app.route("/api/config", configRoutes(ctx));
 	app.route("/api/status", statusRoutes(ctx));
 	app.route("/api/logs", logsRoutes());
+	app.route("/api/restart", restartRoutes());
 
 	// Static files from dist/web/
 	const distDir = join(import.meta.dir, "../../../dist/web");
