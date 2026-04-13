@@ -19,7 +19,9 @@
 		"restart": "bin/openmantis restart",
 		"typecheck": "bun x tsc --noEmit",
 		"check": "biome check --write --unsafe",
-		"build:web": "bun --filter @openmantis/web build"
+		"build:web": "bun --filter @openmantis/web build",
+		"build:bin": "bun scripts/build.ts",
+		"build:bin:all": "bun scripts/build.ts --all"
 	},
 	"dependencies": {
 		"@openmantis/channel-feishu": "workspace:*",

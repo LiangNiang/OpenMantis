@@ -8,6 +8,7 @@ skills/custom
 # output
 out
 dist/
+dist/bin/
 *.tgz
 
 # code coverage
