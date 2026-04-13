@@ -1,12 +1,12 @@
 import { existsSync } from "node:fs";
 import { readFile, unlink } from "node:fs/promises";
-import { LOG_FILE, OPENMANTIS_HOME, PID_FILE, ensureDir } from "@openmantis/common/paths";
+import { ensureDir, LOG_FILE, OPENMANTIS_HOME, PID_FILE } from "@openmantis/common/paths";
 
 async function readPid(): Promise<number | null> {
 	try {
 		if (!existsSync(PID_FILE)) return null;
 		const content = await readFile(PID_FILE, "utf-8");
-		const pid = Number.parseInt(content.trim());
+		const pid = Number.parseInt(content.trim(), 10);
 		return Number.isNaN(pid) ? null : pid;
 	} catch {
 		return null;

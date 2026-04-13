@@ -9,6 +9,10 @@ skills/custom
 out
 dist/
 dist/bin/
+
+# generated at build time
+src/_web-assets.generated.ts
+src/_skill-files.generated.ts
 *.tgz
 
 # code coverage

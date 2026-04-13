@@ -42,35 +42,26 @@ function createEmbeddedWebServer(ctx: WebServerContext) {
 	app.route("/api/logs", logsRoutes());
 	app.route("/api/restart", restartRoutes());
 
-	// Build asset map from embedded files
-	const assets = new Map<string, Blob>();
-	let indexHtml: Blob | undefined;
-	for (const file of Bun.embeddedFiles) {
-		const name = (file as Blob & { name: string }).name;
-		const webIdx = name.indexOf("dist/web/");
-		if (webIdx !== -1) {
-			const relativePath = name.slice(webIdx + "dist/web/".length);
-			assets.set(relativePath, file);
-			if (relativePath === "index.html") {
-				indexHtml = file;
-			}
-		}
-	}
+	// Web assets registered by cli.ts from the generated import module
+	const webAssets =
+		((globalThis as any).__EMBEDDED_WEB_ASSETS__ as Record<string, string> | undefined) ?? {};
 
-	// Serve embedded assets
+	// Serve embedded assets — values are $bunfs paths from `import with { type: "file" }`
 	app.get("/assets/*", async (c) => {
 		const assetPath = c.req.path.slice(1); // remove leading /
-		const blob = assets.get(assetPath);
-		if (!blob) return c.notFound();
-		return new Response(blob, {
+		const filePath = webAssets[assetPath];
+		if (!filePath) return c.notFound();
+		return new Response(Bun.file(filePath), {
 			headers: { "Content-Type": getMimeType(assetPath) },
 		});
 	});
 
 	// SPA fallback
+	const indexHtmlPath = webAssets["index.html"];
+
 	app.get("*", async (c) => {
-		if (!indexHtml) return c.text("Web UI not available in this build", 500);
-		const html = await indexHtml.text();
+		if (!indexHtmlPath) return c.text("Web UI not available in this build", 500);
+		const html = await Bun.file(indexHtmlPath).text();
 		return c.html(html);
 	});
 
@@ -104,8 +95,8 @@ function createDiskWebServer(ctx: WebServerContext) {
 }
 
 export function createWebServer(ctx: WebServerContext) {
-	const isCompiled = Bun.embeddedFiles.length > 0;
-	if (isCompiled) {
+	const hasEmbeddedAssets = !!(globalThis as any).__EMBEDDED_WEB_ASSETS__;
+	if (hasEmbeddedAssets) {
 		logger.debug("[web] Serving embedded web assets");
 		return createEmbeddedWebServer(ctx);
 	}

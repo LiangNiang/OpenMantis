@@ -15,5 +15,6 @@
     "types": ["bun"],
     "jsx": "react-jsx"
   },
-  "include": ["src", "scripts", "packages/core/src"]
+  "include": ["src", "scripts", "packages/core/src"],
+  "exclude": ["src/_*.generated.ts"]
 }

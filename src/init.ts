@@ -1,14 +1,17 @@
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { SKILLS_DIR } from "@openmantis/common/paths";
 import { createLogger } from "@openmantis/common/logger";
+import { SKILLS_DIR } from "@openmantis/common/paths";
 
 const logger = createLogger("init");
 
 /**
  * Extract embedded builtin skills to ~/.openmantis/skills/builtin/.
  * Skips if the directory already exists unless force=true.
+ *
+ * Embedded skill files are registered in globalThis.__EMBEDDED_SKILL_FILES__
+ * by cli.ts from the generated import module.
  */
 export async function initBuiltinSkills(force = false): Promise<void> {
 	const builtinDir = join(SKILLS_DIR, "builtin");
@@ -18,27 +21,27 @@ export async function initBuiltinSkills(force = false): Promise<void> {
 		return;
 	}
 
-	const embeddedSkills = Bun.embeddedFiles.filter((f) =>
-		(f as Blob & { name: string }).name.includes("skills/builtin/"),
-	);
+	const skillFiles =
+		((globalThis as any).__EMBEDDED_SKILL_FILES__ as Record<string, string> | undefined) ?? {};
 
-	if (embeddedSkills.length === 0) {
+	const entries = Object.entries(skillFiles);
+	if (entries.length === 0) {
 		logger.debug("[init] no embedded builtin skills found");
 		return;
 	}
 
-	logger.info(`[init] extracting ${embeddedSkills.length} builtin skill files...`);
+	logger.info(`[init] extracting ${entries.length} builtin skill files...`);
 
-	for (const file of embeddedSkills) {
-		const name = (file as Blob & { name: string }).name;
-		const skillIdx = name.indexOf("skills/builtin/");
-		if (skillIdx === -1) continue;
+	for (const [key, filePath] of entries) {
+		// key is like "skills/builtin/docx/SKILL.md"
+		const prefix = "skills/builtin/";
+		if (!key.startsWith(prefix)) continue;
 
-		const relativePath = name.slice(skillIdx + "skills/builtin/".length);
+		const relativePath = key.slice(prefix.length);
 		const targetPath = join(builtinDir, relativePath);
 
 		await mkdir(dirname(targetPath), { recursive: true });
-		const content = await file.arrayBuffer();
+		const content = await Bun.file(filePath).arrayBuffer();
 		await writeFile(targetPath, new Uint8Array(content));
 	}
 
