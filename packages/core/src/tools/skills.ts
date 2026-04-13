@@ -3,6 +3,7 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import type { OpenMantisConfig } from "@openmantis/common/config/schema";
 import { createLogger } from "@openmantis/common/logger";
+import { SKILLS_DIR, WORKSPACE_DIR } from "@openmantis/common/paths";
 import { type Tool, tool } from "ai";
 import matter from "gray-matter";
 import { z } from "zod";
@@ -207,10 +208,8 @@ function wrapSkillTool(t: Tool): Tool {
 					fileList.length > 0
 						? `**Files** (no need to explore the directory):\n${fileList.map((f: string) => `- ${f}`).join("\n")}\n\n`
 						: "";
-				const projectRoot = process.cwd();
-				const workspace = `${projectRoot}/.openmantis/workspace`;
+				const workspace = WORKSPACE_DIR;
 				const header =
-					`**Project root**: \`${projectRoot}\`\n` +
 					`**Skill directory**: \`${skillPath}\`\n` +
 					`**Output directory**: \`${workspace}/\` (create subdirs as needed, e.g. \`${workspace}/reports/\`)\n\n` +
 					`**CRITICAL — Output files MUST end up in \`${workspace}/\`**:\n` +
@@ -257,7 +256,7 @@ export async function createSkillTools(config?: OpenMantisConfig) {
 
 	// Built-in skills
 	if (skillsConfig?.builtinEnabled !== false) {
-		const builtinDir = path.resolve(import.meta.dir, "../../../../skills/builtin");
+		const builtinDir = path.join(SKILLS_DIR, "builtin");
 		if (existsSync(builtinDir)) {
 			try {
 				let skills = await discoverSkills(builtinDir, "skills/builtin");
@@ -280,7 +279,7 @@ export async function createSkillTools(config?: OpenMantisConfig) {
 	}
 
 	// Custom skills (skills/custom directory)
-	const customDir = path.resolve(import.meta.dir, "../../../../skills/custom");
+	const customDir = path.join(SKILLS_DIR, "custom");
 	if (existsSync(customDir)) {
 		try {
 			const skills = await discoverSkills(customDir, "skills/custom");
@@ -295,27 +294,6 @@ export async function createSkillTools(config?: OpenMantisConfig) {
 			}
 		} catch (err) {
 			logger.error(`[skills] failed to load custom skills: ${err}`);
-		}
-	}
-
-	// User-defined skills (from config directory)
-	if (skillsConfig?.directory) {
-		const userDir = path.resolve(skillsConfig.directory);
-		if (existsSync(userDir)) {
-			try {
-				const skills = await discoverSkills(userDir, "skills/user");
-				if (skills.length > 0) {
-					instructions += `${generateSkillInstructions(skills)}\n`;
-					const loaderTool = createSkillLoaderTool(skills);
-					const wrapped = wrapSkillTool(loaderTool);
-					for (const skill of skills) {
-						tools[`skill_${skill.name}`] = wrapped;
-					}
-					logger.debug(`[skills] loaded ${skills.length} user skills from ${userDir}`);
-				}
-			} catch (err) {
-				logger.warn(`[skills] failed to load user skills: ${err}`);
-			}
 		}
 	}
 

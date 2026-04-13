@@ -1,6 +1,7 @@
 import os from "node:os";
 import type { OpenMantisConfig } from "@openmantis/common/config/schema";
 import { createLogger } from "@openmantis/common/logger";
+import { WORKSPACE_DIR } from "@openmantis/common/paths";
 import { tool } from "ai";
 import { z } from "zod";
 
@@ -165,8 +166,8 @@ Using dedicated tools returns structured results, significantly reduces token us
 - Quote file paths containing spaces with double quotes.
 - Commands run in the project working directory. Use absolute paths to avoid ambiguity.
 - Default timeout is 600 seconds (10 minutes). For known short commands, set a shorter timeout. For long-running operations (builds, large downloads), the default is usually sufficient.
-- All generated files (documents, reports, images, audio, downloads, etc.) MUST end up in \`.openmantis/workspace/\`. Create the directory first if needed. Never leave output files in the project root, skill directories, or other locations.
-- When running skill scripts: use ABSOLUTE paths (never \`cd\` into the skill directory). If the script supports an output directory flag, use it to write to \`.openmantis/workspace/\`. If not, run the script then move output files to \`.openmantis/workspace/\`.
+- All generated files (documents, reports, images, audio, downloads, etc.) MUST end up in \`${WORKSPACE_DIR}/\`. Create the directory first if needed. Never leave output files in the project root, skill directories, or other locations.
+- When running skill scripts: use ABSOLUTE paths (never \`cd\` into the skill directory). If the script supports an output directory flag, use it to write to \`${WORKSPACE_DIR}/\`. If not, run the script then move output files to \`${WORKSPACE_DIR}/\`.
 
 ### bash_write — Send input to a running session
 - Use when bash returns status "waiting_for_input" and you need to provide interactive input (e.g., confirming a prompt, entering a value).
@@ -202,8 +203,8 @@ export function createBashTools(config?: OpenMantisConfig) {
 	const bash = tool({
 		description: `Execute a shell command and return its output and status. ${getShellEnvironmentHint()}
 
-All generated files (documents, reports, images, audio, downloads, etc.) MUST end up in .openmantis/workspace/. Create the directory first if it doesn't exist. Never leave output files in the project root, skill directories, or other locations.
-When running skill scripts: use ABSOLUTE paths (never cd into the skill directory). If the script supports an output directory flag (--outdir, -o, etc.), use it to write directly to .openmantis/workspace/. If not, run the script then move the output files to .openmantis/workspace/.
+All generated files (documents, reports, images, audio, downloads, etc.) MUST end up in ${WORKSPACE_DIR}/. Create the directory first if it doesn't exist. Never leave output files in the project root, skill directories, or other locations.
+When running skill scripts: use ABSOLUTE paths (never cd into the skill directory). If the script supports an output directory flag (--outdir, -o, etc.), use it to write directly to ${WORKSPACE_DIR}/. If not, run the script then move the output files to ${WORKSPACE_DIR}/.
 
 When status is "waiting_for_input", the command produced no output within the silence window. It may still be running normally (network requests, builds, model inference, image generation) or waiting for interactive input. Handle by priority:
 1. **Assume long-running first**: For API calls, image/video generation, model inference, downloads, builds, or installs — call bash_wait to continue waiting. Do NOT kill.
