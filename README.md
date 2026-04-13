@@ -258,6 +258,8 @@ bun run check          # Biome 代码检查 + 格式化
 bun run build:web      # 构建 Web 前端
 ```
 
+> **注意：** `dev:full` 模式下，Vite 会自动选择可用端口启动前端开发服务器，请直接访问 Vite 输出的地址（如 `http://localhost:5173`）。API 请求会由 Vite 自动代理到后端（默认 `localhost:7777`）。
+
 ## 联系
 
 - **Email**: liangniangbaby@gmail.com

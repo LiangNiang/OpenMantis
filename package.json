@@ -12,7 +12,7 @@
 	"workspaces": ["packages/*"],
 	"scripts": {
 		"dev": "LOG_LEVEL=debug bun --watch src/index.ts",
-		"dev:full": "bun run dev:web & DEV_WEB=true bun run dev",
+		"dev:full": "bun run dev:web & bun run dev",
 		"dev:web": "bun --filter @openmantis/web dev",
 		"start": "bin/openmantis start",
 		"stop": "bin/openmantis stop",

@@ -258,6 +258,8 @@ bun run check          # Biome lint + format
 bun run build:web      # Build web frontend
 ```
 
+> **Note:** In `dev:full` mode, Vite automatically picks an available port for the frontend dev server. Access the URL printed by Vite (e.g., `http://localhost:5173`). API requests are automatically proxied to the backend (default `localhost:7777`).
+
 ## Contact
 
 - **Email**: liangniangbaby@gmail.com

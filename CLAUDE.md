@@ -25,8 +25,8 @@ openmantis log         # Tail log file
 ```bash
 bun install              # Install dependencies
 bun run dev              # Dev mode with watch + debug logging
-bun run dev:full         # Dev with backend + Vite dev server
-bun run dev:web          # Web frontend watch mode (Vite)
+bun run dev:full         # Dev with backend + Vite dev server (access Vite URL directly, API auto-proxied)
+bun run dev:web          # Web frontend watch mode (Vite, auto-selects available port)
 bun run typecheck        # TypeScript type-check (tsc --noEmit)
 bun run check            # Biome lint + format (with --unsafe)
 bun run build:web        # Build web frontend
