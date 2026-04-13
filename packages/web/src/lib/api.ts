@@ -87,6 +87,7 @@ export const api = {
 		request<{ restartRequired: boolean }>("/api/config/restart-required"),
 	getStatus: () =>
 		request<{
+			startTime: number
 			uptime: number
 			defaultProvider: string
 			provider: string
@@ -95,4 +96,8 @@ export const api = {
 			channels: string[]
 			hasConfig: boolean
 		}>("/api/status"),
+	restart: () =>
+		request<{ restarting: boolean }>("/api/restart", {
+			method: "POST",
+		}),
 }

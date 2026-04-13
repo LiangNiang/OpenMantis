@@ -169,5 +169,12 @@
 	"banner.restartRequired.description": "配置已保存，请手动重启 OpenMantis 以使更改生效。",
 
 	"dialog.resetConfirmTitle": "重置设置？",
-	"dialog.resetConfirmDescription": "这将把 {section} 的所有设置恢复为默认值，此操作无法撤销。"
+	"dialog.resetConfirmDescription": "这将把 {section} 的所有设置恢复为默认值，此操作无法撤销。",
+	"common.restart": "重启",
+	"common.restarting": "重启中...",
+	"dialog.restartConfirmTitle": "确认重启",
+	"dialog.restartConfirmDescription": "重启将中断当前所有正在进行的对话，确定要继续吗？",
+	"restart.banner.button": "立即重启",
+	"restart.overlay.message": "OpenMantis 正在重启，请稍候...",
+	"restart.failed": "重启失败，请手动重启。"
 }

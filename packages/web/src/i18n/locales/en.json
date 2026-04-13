@@ -169,5 +169,12 @@
 	"banner.restartRequired.description": "Configuration saved. Please restart OpenMantis manually for changes to take effect.",
 
 	"dialog.resetConfirmTitle": "Reset Settings?",
-	"dialog.resetConfirmDescription": "This will reset all {section} settings to their default values. This action cannot be undone."
+	"dialog.resetConfirmDescription": "This will reset all {section} settings to their default values. This action cannot be undone.",
+	"common.restart": "Restart",
+	"common.restarting": "Restarting...",
+	"dialog.restartConfirmTitle": "Confirm Restart",
+	"dialog.restartConfirmDescription": "Restarting will interrupt all ongoing conversations. Are you sure you want to continue?",
+	"restart.banner.button": "Restart Now",
+	"restart.overlay.message": "OpenMantis is restarting, please wait...",
+	"restart.failed": "Restart failed. Please restart manually."
 }
