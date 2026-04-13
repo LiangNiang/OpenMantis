@@ -23,9 +23,9 @@
 	},
 	"dependencies": {
 		"@openmantis/channel-feishu": "workspace:*",
-		"@openmantis/common": "workspace:*",
 		"@openmantis/channel-qq": "workspace:*",
 		"@openmantis/channel-wecom": "workspace:*",
+		"@openmantis/common": "workspace:*",
 		"@openmantis/core": "workspace:*",
 		"@openmantis/scheduler": "workspace:*",
 		"@openmantis/web-server": "workspace:*",
