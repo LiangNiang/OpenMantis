@@ -13,11 +13,74 @@ import { statusRoutes } from "./api/status";
 import { authMiddleware } from "./middleware/auth";
 import type { WebServerContext } from "./types";
 
-export function createWebServer(ctx: WebServerContext) {
+const MIME_TYPES: Record<string, string> = {
+	".html": "text/html",
+	".js": "application/javascript",
+	".css": "text/css",
+	".json": "application/json",
+	".png": "image/png",
+	".jpg": "image/jpeg",
+	".jpeg": "image/jpeg",
+	".svg": "image/svg+xml",
+	".ico": "image/x-icon",
+	".woff": "font/woff",
+	".woff2": "font/woff2",
+	".ttf": "font/ttf",
+};
+
+function getMimeType(path: string): string {
+	const ext = path.slice(path.lastIndexOf("."));
+	return MIME_TYPES[ext] || "application/octet-stream";
+}
+
+function createEmbeddedWebServer(ctx: WebServerContext) {
 	const app = new Hono();
 
 	app.use("/api/*", authMiddleware(ctx.authToken));
+	app.route("/api/config", configRoutes(ctx));
+	app.route("/api/status", statusRoutes(ctx));
+	app.route("/api/logs", logsRoutes());
+	app.route("/api/restart", restartRoutes());
 
+	// Build asset map from embedded files
+	const assets = new Map<string, Blob>();
+	let indexHtml: Blob | undefined;
+	for (const file of Bun.embeddedFiles) {
+		const name = (file as Blob & { name: string }).name;
+		const webIdx = name.indexOf("dist/web/");
+		if (webIdx !== -1) {
+			const relativePath = name.slice(webIdx + "dist/web/".length);
+			assets.set(relativePath, file);
+			if (relativePath === "index.html") {
+				indexHtml = file;
+			}
+		}
+	}
+
+	// Serve embedded assets
+	app.get("/assets/*", async (c) => {
+		const assetPath = c.req.path.slice(1); // remove leading /
+		const blob = assets.get(assetPath);
+		if (!blob) return c.notFound();
+		return new Response(blob, {
+			headers: { "Content-Type": getMimeType(assetPath) },
+		});
+	});
+
+	// SPA fallback
+	app.get("*", async (c) => {
+		if (!indexHtml) return c.text("Web UI not available in this build", 500);
+		const html = await indexHtml.text();
+		return c.html(html);
+	});
+
+	return app;
+}
+
+function createDiskWebServer(ctx: WebServerContext) {
+	const app = new Hono();
+
+	app.use("/api/*", authMiddleware(ctx.authToken));
 	app.route("/api/config", configRoutes(ctx));
 	app.route("/api/status", statusRoutes(ctx));
 	app.route("/api/logs", logsRoutes());
@@ -38,6 +101,16 @@ export function createWebServer(ctx: WebServerContext) {
 	});
 
 	return app;
+}
+
+export function createWebServer(ctx: WebServerContext) {
+	const isCompiled = Bun.embeddedFiles.length > 0;
+	if (isCompiled) {
+		logger.debug("[web] Serving embedded web assets");
+		return createEmbeddedWebServer(ctx);
+	}
+	logger.debug("[web] Serving web assets from disk");
+	return createDiskWebServer(ctx);
 }
 
 export async function startWebServer(ctx: WebServerContext): Promise<WebServer> {
