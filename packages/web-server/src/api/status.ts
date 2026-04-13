@@ -22,6 +22,7 @@ export function statusRoutes(ctx: WebServerContext) {
 		}
 		return c.json(
 			ok({
+				startTime: startedAt,
 				uptime: Date.now() - startedAt,
 				defaultProvider: config.defaultProvider,
 				provider: defaultProviderInfo.provider,
