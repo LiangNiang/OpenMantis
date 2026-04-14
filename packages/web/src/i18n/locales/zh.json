@@ -3,6 +3,7 @@
 	"common.save": "保存",
 	"common.saving": "保存中...",
 	"common.cancel": "取消",
+	"common.ok": "知道了",
 	"common.reset": "重置",
 	"common.back": "上一步",
 	"common.next": "下一步",
@@ -176,5 +177,7 @@
 	"dialog.restartConfirmDescription": "重启将中断当前所有正在进行的对话，确定要继续吗？",
 	"restart.banner.button": "立即重启",
 	"restart.overlay.message": "OpenMantis 正在重启，请稍候...",
-	"restart.failed": "重启失败，请手动重启。"
+	"restart.failed": "重启失败，请手动重启。",
+	"restart.manual.title": "当前是开发模式",
+	"restart.manual.message": "开发模式下无法自动重启，请回到终端手动重启 OpenMantis。"
 }

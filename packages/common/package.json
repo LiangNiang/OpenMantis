@@ -15,6 +15,7 @@
 		"./types/tts": "./src/types/tts.ts",
 		"./logger": "./src/logger/index.ts",
 		"./paths": "./src/paths/index.ts",
+		"./runtime": "./src/runtime/index.ts",
 		"./config/schema": "./src/config/schema.ts",
 		"./config/sensitive": "./src/config/sensitive.ts",
 		"./config/merge": "./src/config/merge.ts"

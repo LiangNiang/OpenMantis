@@ -97,7 +97,7 @@ export const api = {
 			hasConfig: boolean
 		}>("/api/status"),
 	restart: () =>
-		request<{ restarting: boolean }>("/api/restart", {
+		request<{ restarting: boolean; devMode: boolean }>("/api/restart", {
 			method: "POST",
 		}),
 }

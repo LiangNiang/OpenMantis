@@ -9,7 +9,7 @@ import { useState } from "react";
 export function RestartBanner() {
 	const { restartRequired } = useConfig();
 	const { t } = useLocale();
-	const { status, triggerRestart } = useRestart();
+	const { status, triggerRestart, dismiss } = useRestart();
 	const [showConfirm, setShowConfirm] = useState(false);
 
 	if (!restartRequired && status === "idle") return null;
@@ -51,7 +51,7 @@ export function RestartBanner() {
 				onOpenChange={setShowConfirm}
 				onConfirm={triggerRestart}
 			/>
-			<RestartOverlay status={status} />
+			<RestartOverlay status={status} onDismiss={dismiss} />
 		</>
 	);
 }

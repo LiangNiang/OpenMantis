@@ -2,7 +2,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 
-export type RestartStatus = "idle" | "restarting" | "reconnecting" | "ready" | "failed";
+export type RestartStatus =
+	| "idle"
+	| "restarting"
+	| "reconnecting"
+	| "ready"
+	| "failed"
+	| "manual";
 
 const POLL_INTERVAL = 1000;
 const TIMEOUT = 30_000;
@@ -52,12 +58,21 @@ export function useRestart() {
 			const statusData = await api.getStatus();
 			startTimeRef.current = statusData.startTime;
 			setStatus("restarting");
-			await api.restart();
+			const result = await api.restart();
+			if (result.devMode) {
+				setStatus("manual");
+				return;
+			}
 			pollForReady();
 		} catch {
 			setStatus("failed");
 		}
 	}, [pollForReady]);
 
-	return { status, triggerRestart };
+	const dismiss = useCallback(() => {
+		cleanup();
+		setStatus("idle");
+	}, [cleanup]);
+
+	return { status, triggerRestart, dismiss };
 }

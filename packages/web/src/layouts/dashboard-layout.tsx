@@ -135,7 +135,7 @@ function DashboardLayoutInner({ config, error, updateConfig, resetConfig }: Inne
 	const [saveError, setSaveError] = useState<string | null>(null);
 	const [showResetConfirm, setShowResetConfirm] = useState(false);
 	const [showRestartConfirm, setShowRestartConfirm] = useState(false);
-	const { status: restartStatus, triggerRestart } = useRestart();
+	const { status: restartStatus, triggerRestart, dismiss: dismissRestart } = useRestart();
 
 	const sections = useMemo(
 		() =>
@@ -517,7 +517,7 @@ whisper: config.whisper,
 				onOpenChange={setShowRestartConfirm}
 				onConfirm={triggerRestart}
 			/>
-			<RestartOverlay status={restartStatus} />
+			<RestartOverlay status={restartStatus} onDismiss={dismissRestart} />
 			</div>
 		</div>
 	);

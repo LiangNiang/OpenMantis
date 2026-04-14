@@ -1,6 +1,7 @@
 // packages/core/src/lifecycle.ts
 import { createLogger } from "@openmantis/common/logger";
 import { PID_FILE } from "@openmantis/common/paths";
+import { isCompiledBinary } from "@openmantis/common/runtime";
 
 const logger = createLogger("lifecycle");
 
@@ -37,7 +38,11 @@ export async function restartProcess(): Promise<void> {
 	}
 
 	try {
-		const args = process.argv.slice(1);
+		// In a compiled Bun binary, argv[1] is an internal /$bunfs/... path
+		// that the runtime injects automatically on each launch. Forwarding
+		// it to the child clobbers argv[2] (the real command) and the new
+		// process exits immediately with USAGE.
+		const args = isCompiledBinary() ? process.argv.slice(2) : process.argv.slice(1);
 		const child = Bun.spawn([process.execPath, ...args], {
 			stdio: ["inherit", "inherit", "inherit"],
 			env: process.env,

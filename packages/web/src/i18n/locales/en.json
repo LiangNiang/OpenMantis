@@ -3,6 +3,7 @@
 	"common.save": "Save",
 	"common.saving": "Saving...",
 	"common.cancel": "Cancel",
+	"common.ok": "Got it",
 	"common.reset": "Reset",
 	"common.back": "Back",
 	"common.next": "Next",
@@ -176,5 +177,7 @@
 	"dialog.restartConfirmDescription": "Restarting will interrupt all ongoing conversations. Are you sure you want to continue?",
 	"restart.banner.button": "Restart Now",
 	"restart.overlay.message": "OpenMantis is restarting, please wait...",
-	"restart.failed": "Restart failed. Please restart manually."
+	"restart.failed": "Restart failed. Please restart manually.",
+	"restart.manual.title": "Development mode",
+	"restart.manual.message": "Auto-restart is disabled in development mode. Please restart OpenMantis manually from your terminal."
 }
