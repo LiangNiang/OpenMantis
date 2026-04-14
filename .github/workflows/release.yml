@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  build-linux-windows:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,22 +21,64 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Build all platform binaries
-        run: bun run build:bin:all
+      - name: Build Linux and Windows binaries
+        run: |
+          bun scripts/build.ts \
+            --target bun-linux-x64 \
+            --target bun-linux-arm64 \
+            --target bun-windows-x64 \
+            --target bun-windows-arm64
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: binaries
+          name: binaries-linux-windows
+          path: dist/bin/
+
+  build-macos:
+    # macOS runner is required so we can ad-hoc codesign the darwin binaries
+    # with JIT entitlements. Cross-compiled (unsigned) darwin binaries are
+    # killed by the kernel/Gatekeeper on launch.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build and sign macOS binaries
+        run: |
+          bun scripts/build.ts \
+            --target bun-darwin-x64 \
+            --target bun-darwin-arm64
+
+      - name: Verify codesign
+        run: |
+          codesign -vvv --verify dist/bin/openmantis-darwin-x64
+          codesign -vvv --verify dist/bin/openmantis-darwin-arm64
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries-macos
           path: dist/bin/
 
   release:
-    needs: build
+    needs: [build-linux-windows, build-macos]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: binaries
+          name: binaries-linux-windows
+          path: dist/bin/
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: binaries-macos
           path: dist/bin/
 
       - name: Create GitHub Release

@@ -49,6 +49,22 @@ chmod +x openmantis-linux-x64
 ./openmantis-linux-x64 start     # Start daemon
 ```
 
+> [!IMPORTANT]
+> macOS users: binaries downloaded from GitHub Releases get tagged with the `com.apple.quarantine` attribute and may be blocked by Gatekeeper on first run ("cannot be opened because the developer cannot be verified"). Remove the quarantine attribute:
+>
+> ```bash
+> xattr -d com.apple.quarantine ./openmantis-darwin-arm64
+> chmod +x ./openmantis-darwin-arm64
+> ```
+
+> [!IMPORTANT]
+> Windows users: do not double-click the `.exe` — it is a CLI program, and double-clicking only flashes a black console window that disappears. Open **PowerShell** or **CMD**, `cd` to the binary's directory, then run:
+>
+> ```powershell
+> .\openmantis-windows-x64.exe init      # Extract built-in skills
+> .\openmantis-windows-x64.exe start     # Start daemon
+> ```
+
 ### Option 2: From Source
 
 ```bash

@@ -49,6 +49,22 @@ chmod +x openmantis-linux-x64
 ./openmantis-linux-x64 start     # 启动守护进程
 ```
 
+> [!IMPORTANT]
+> macOS 用户：从 GitHub Releases 下载的二进制会被系统打上 `com.apple.quarantine` 隔离标记，首次运行可能被 Gatekeeper 拦截（提示「无法打开，因为无法验证开发者」）。执行以下命令移除隔离标记即可：
+>
+> ```bash
+> xattr -d com.apple.quarantine ./openmantis-darwin-arm64
+> chmod +x ./openmantis-darwin-arm64
+> ```
+
+> [!IMPORTANT]
+> Windows 用户：请勿双击 `.exe` 运行（会出现黑色窗口一闪而过），它是命令行程序。请打开 **PowerShell** 或 **CMD**，切换到文件所在目录后执行：
+>
+> ```powershell
+> .\openmantis-windows-x64.exe init      # 初始化内置技能
+> .\openmantis-windows-x64.exe start     # 启动守护进程
+> ```
+
 ### 方式二：从源码运行
 
 ```bash

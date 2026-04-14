@@ -91,6 +91,50 @@ ${entries.join("\n")}
 	}
 }
 
+async function signDarwin(outfile: string, targetName: string): Promise<void> {
+	if (process.platform !== "darwin") {
+		console.warn(
+			`⚠️  Skipping codesign for ${targetName}: not running on macOS. ` +
+				"The binary will likely fail to launch on macOS (killed by Gatekeeper/kernel). " +
+				"Build darwin targets on a macOS runner.",
+		);
+		return;
+	}
+
+	const entitlements = "scripts/entitlements.plist";
+
+	// `bun build --compile` leaves a pre-embedded signature blob that
+	// `codesign` refuses to overwrite ("invalid or unsupported format for
+	// signature"). Strip it first, then apply an ad-hoc signature with the
+	// JIT entitlements Bun requires to run on macOS.
+	const remove = Bun.spawn(
+		["codesign", "--remove-signature", outfile],
+		{ stdio: ["inherit", "inherit", "inherit"] },
+	);
+	if ((await remove.exited) !== 0) {
+		throw new Error("codesign --remove-signature failed");
+	}
+
+	console.log(`Ad-hoc signing ${outfile} with JIT entitlements...`);
+	const proc = Bun.spawn(
+		[
+			"codesign",
+			"--sign",
+			"-",
+			"--force",
+			"--timestamp=none",
+			"--entitlements",
+			entitlements,
+			outfile,
+		],
+		{ stdio: ["inherit", "inherit", "inherit"] },
+	);
+	const exitCode = await proc.exited;
+	if (exitCode !== 0) {
+		throw new Error(`codesign failed with exit code ${exitCode}`);
+	}
+}
+
 async function compile(target?: string) {
 	const targets = target
 		? TARGETS.filter((t) => t.target === target)
@@ -125,13 +169,25 @@ async function compile(target?: string) {
 		}
 
 		console.log(`Built: ${outfile}`);
+
+		const isDarwin = t
+			? t.target.startsWith("bun-darwin-")
+			: process.platform === "darwin";
+		if (isDarwin) {
+			await signDarwin(outfile, t?.target ?? "current platform");
+		}
 	}
 }
 
 async function main() {
 	const args = process.argv.slice(2);
-	const targetFlag = args.indexOf("--target");
-	const target = targetFlag !== -1 ? args[targetFlag + 1] : undefined;
+	const targets: string[] = [];
+	for (let i = 0; i < args.length; i++) {
+		if (args[i] === "--target" && args[i + 1]) {
+			targets.push(args[i + 1]!);
+			i++;
+		}
+	}
 	const all = args.includes("--all");
 
 	await rm("dist", { recursive: true, force: true });
@@ -144,8 +200,12 @@ async function main() {
 			for (const t of TARGETS) {
 				await compile(t.target);
 			}
+		} else if (targets.length > 0) {
+			for (const t of targets) {
+				await compile(t);
+			}
 		} else {
-			await compile(target);
+			await compile();
 		}
 	} finally {
 		// Clean up generated files to avoid typecheck issues
