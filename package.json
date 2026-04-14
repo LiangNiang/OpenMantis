@@ -11,12 +11,9 @@
 	"private": true,
 	"workspaces": ["packages/*"],
 	"scripts": {
-		"dev": "LOG_LEVEL=debug bun --watch src/index.ts",
+		"dev": "LOG_LEVEL=debug bun --watch src/cli.ts run",
 		"dev:full": "bun run dev:web & bun run dev",
 		"dev:web": "bun --filter @openmantis/web dev",
-		"start": "bin/openmantis start",
-		"stop": "bin/openmantis stop",
-		"restart": "bin/openmantis restart",
 		"typecheck": "bun x tsc --noEmit",
 		"check": "biome check --write --unsafe",
 		"build:web": "bun --filter @openmantis/web build",
