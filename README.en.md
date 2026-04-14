@@ -33,36 +33,48 @@ Connect multiple LLM providers to multiple communication channels with composabl
 
 ## Prerequisites
 
-- [Bun](https://bun.sh)
 - An API key for at least one supported LLM provider
 - Channel credentials (Feishu app, WeCom bot, or QQ bot) for the platforms you want to connect
+- [Bun](https://bun.sh) is only required when running from source; pre-built binaries need no runtime
 
 ## Getting Started
 
-### 1. Install dependencies
+### Option 1: Pre-built Binary (Recommended)
+
+Download the binary for your platform from [Releases](https://github.com/LiangNiang/OpenMantis/releases) — no Bun or dependencies needed:
+
+```bash
+chmod +x openmantis-linux-x64
+./openmantis-linux-x64 init      # Extract built-in skills
+./openmantis-linux-x64 start     # Start daemon
+```
+
+### Option 2: From Source
 
 ```bash
 git clone https://github.com/LiangNiang/OpenMantis.git
 cd OpenMantis
 bun install
+bun run dev                      # Dev mode (foreground)
 ```
 
-### 2. Run
-
-```bash
-./bin/openmantis start
-```
+### First-Time Setup
 
 On first start, OpenMantis automatically launches a **setup wizard** at `http://127.0.0.1:7777` — follow the steps to configure your provider, channels, and tools. Restart after setup to apply changes.
 
-```bash
-./bin/openmantis restart   # Restart
-./bin/openmantis stop      # Stop
-./bin/openmantis status    # Show running status
-./bin/openmantis log       # Tail log file
-```
+Runtime data is stored in `~/.openmantis/` (customizable via `OPENMANTIS_DATA_DIR` environment variable).
 
-> You can also use it globally via symlink: `ln -s /path/to/OpenMantis/bin/openmantis /usr/local/bin/openmantis`
+### CLI Commands
+
+```bash
+openmantis start       # Start daemon
+openmantis stop        # Stop
+openmantis restart     # Restart
+openmantis status      # Show running status
+openmantis log         # Tail log file
+openmantis run         # Run in foreground (for Docker or debugging)
+openmantis init        # Extract built-in skills (--force to overwrite)
+```
 
 ## Usage Examples
 
@@ -95,7 +107,11 @@ Messages flow from a channel adapter through the **Gateway**, which manages sess
 
 ```
 OpenMantis/
-├── src/index.ts                  # Entry point
+├── src/
+│   ├── cli.ts                    # CLI entry (start/stop/restart/run/init)
+│   ├── index.ts                  # Main application logic
+│   ├── daemon.ts                 # Daemon management
+│   └── init.ts                   # Built-in skills extraction
 ├── packages/
 │   ├── common/                   # Shared types, logger, config schema
 │   ├── core/                     # Agent, gateway, commands, tools
@@ -107,7 +123,8 @@ OpenMantis/
 │   ├── web/                      # React 19 + Vite + Tailwind v4 dashboard
 │   └── web-server/               # Hono API server
 ├── skills/builtin/               # Built-in agent skills
-└── .openmantis/                  # Runtime data (message routes, config, logs)
+├── scripts/build.ts              # Binary build script
+└── ~/.openmantis/                # Runtime data (config, message routes, skills, logs)
 ```
 
 ## LLM Providers
@@ -145,7 +162,7 @@ Channel-specific tools (Feishu file uploads, doc creation, etc.) are injected au
 
 ## Skills
 
-Built-in skills are loaded from `skills/builtin/`. Users can also add custom skills via `config.skills.directory`.
+Built-in skills are extracted to `~/.openmantis/skills/builtin/` on first run via `openmantis init`. Custom skills go in `~/.openmantis/skills/custom/`.
 
 | Skill | Description |
 |-------|-------------|
@@ -238,16 +255,6 @@ DEBUG_PROMPT=true    # Print system prompt
 
 ## Scripts Reference
 
-**Production (CLI):**
-
-```bash
-openmantis start       # Start daemon
-openmantis stop        # Stop
-openmantis restart     # Restart
-openmantis status      # Show running status
-openmantis log         # Tail log file
-```
-
 **Development:**
 
 ```bash
@@ -256,6 +263,13 @@ bun run dev:full       # Dev mode with backend + Vite dev server
 bun run typecheck      # Type-check with tsc
 bun run check          # Biome lint + format
 bun run build:web      # Build web frontend
+```
+
+**Build Binaries:**
+
+```bash
+bun run build:bin      # Build binary for current platform
+bun run build:bin:all  # Build all platforms (Linux/macOS/Windows, x64/ARM64)
 ```
 
 > **Note:** In `dev:full` mode, Vite automatically picks an available port for the frontend dev server. Access the URL printed by Vite (e.g., `http://localhost:5173`). API requests are automatically proxied to the backend (default `localhost:7777`).
