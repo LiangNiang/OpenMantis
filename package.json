@@ -11,7 +11,7 @@
 	"private": true,
 	"workspaces": ["packages/*"],
 	"scripts": {
-		"dev": "LOG_LEVEL=debug bun --watch src/cli.ts run",
+		"dev": "OPENMANTIS_DATA_DIR=\"$PWD/.openmantis\" LOG_LEVEL=debug bun --watch src/cli.ts run",
 		"dev:full": "bun run dev:web & bun run dev",
 		"dev:web": "bun --filter @openmantis/web dev",
 		"typecheck": "bun x tsc --noEmit",
