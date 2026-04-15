@@ -4,21 +4,13 @@ import path from "node:path";
 import type { OpenMantisConfig } from "@openmantis/common/config/schema";
 import { createLogger } from "@openmantis/common/logger";
 import { SKILLS_DIR, WORKSPACE_DIR } from "@openmantis/common/paths";
+import { isCompiledBinary } from "@openmantis/common/runtime";
 import { type Tool, tool } from "ai";
 import matter from "gray-matter";
 import { z } from "zod";
 
 const logger = createLogger("core/tools");
 const BROWSER_SKILL_NAME = "agent-browser";
-
-// `Bun.embeddedFiles` is non-empty only in a `--compile`d single-file executable.
-// Binary build → skills were embedded and extracted to SKILLS_DIR by initBuiltinSkills.
-// Dev (running from source) → read directly from the repo's `skills/` folder so
-// edits are picked up without a rebuild.
-// Hop count for the dev path: packages/core/src/tools → src → core → packages → repo root.
-function isCompiledBinary(): boolean {
-	return (Bun as any).embeddedFiles?.length > 0;
-}
 
 function resolveSkillsRoot(): string {
 	if (isCompiledBinary()) return SKILLS_DIR;
