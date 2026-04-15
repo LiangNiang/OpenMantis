@@ -6,6 +6,7 @@ import { z } from "zod";
 const logger = createLogger("core/tools");
 
 const DEFAULT_READ_LIMIT = 2000;
+const MAX_LINE_LENGTH = 2000;
 
 export const FILE_TOOL_GUIDE = `## File Tools Usage Guide
 
@@ -14,8 +15,11 @@ export const FILE_TOOL_GUIDE = `## File Tools Usage Guide
 ### file_read — Read files
 - No need to check if a file exists before reading — just read it; the tool returns an error if not found.
 - When you already know which part of the file you need, use offset/limit to read only that section. This saves tokens on large files.
-- Do NOT re-read a file you just modified via file_write or file_edit to verify — if the write/edit didn't error, the content is correct.
+- **Never re-read a range you already read in this session.** The tool tracks read ranges per file and will reject any request whose \`[offset, offset+limit)\` is fully covered by a prior read (unless the file was modified via file_write/file_edit since). Reuse the content from your earlier tool result instead of re-reading. If you need additional context around a match from content_search, pick an offset/limit that extends *beyond* what you previously read.
+- Do NOT re-read a file you just modified via file_write or file_edit to verify — if the write/edit didn't error, the content is correct. (After a successful write/edit, the tracking is reset so a fresh read is allowed if truly needed.)
 - Output format is \`lineNumber\\tcontact\` (line numbers start at 1). Note: the line number prefix is NOT part of the file content — do not include it when referencing text in file_edit.
+- Lines longer than ${MAX_LINE_LENGTH} characters are clipped to \`…[truncated N chars]\`. If you need to file_edit such a line, use line range mode (start_line/end_line + new_content) instead of string matching — the clipped text won't match the file on disk.
+- For Word-export HTML, XML with inline styles, minified JS/CSS, or other files with extremely long lines: prefer content_search (grep) to locate keywords first, then file_read a narrow offset/limit window around the match.
 
 ### file_write — Write files
 - Use ONLY for **creating new files** or **complete rewrites**. To modify existing files, **prefer file_edit** — it only transmits the changed portion, saving tokens.
@@ -34,8 +38,16 @@ export const FILE_TOOL_GUIDE = `## File Tools Usage Guide
   - Good for: replacing large contiguous blocks, inserting content at a precise location.
   - Note: if prior edits changed the line count, line numbers may have shifted — re-read with file_read to confirm.`;
 
+type ReadRange = { start: number; end: number };
+
+function isRangeCovered(ranges: ReadRange[], start: number, end: number): boolean {
+	return ranges.some((r) => start >= r.start && end <= r.end);
+}
+
 export function createFileTools() {
-	const readFiles = new Set<string>();
+	// Tracks which line ranges (0-based, end-exclusive) have been read per file.
+	// Reset when the file is written or edited so post-modification reads are allowed.
+	const fileReads = new Map<string, ReadRange[]>();
 	const fileRead = tool({
 		description:
 			"Read file contents. Supports partial reading of large files via offset and limit parameters to save tokens. Output format: line numbers starting from 1. Use this tool instead of bash cat/head/tail.",
@@ -61,14 +73,39 @@ export function createFileTools() {
 				const totalLines = allLines.length;
 				const startLine = Math.max(0, offset ?? 0);
 				const readLimit = limit ?? DEFAULT_READ_LIMIT;
-				const sliced = allLines.slice(startLine, startLine + readLimit);
+				const endLine = Math.min(startLine + readLimit, totalLines);
 
-				const numbered = sliced.map((line, i) => `${startLine + i + 1}\t${line}`).join("\n");
+				const priorRanges = fileReads.get(file_path) ?? [];
+				if (isRangeCovered(priorRanges, startLine, endLine)) {
+					logger.debug(
+						`[tool:file_read] redundant read blocked: ${file_path} [${startLine}, ${endLine}) already covered`,
+					);
+					return {
+						error: `Lines ${startLine + 1}-${endLine} of ${file_path} have already been read in this session and the file has not been modified since. Reuse the content from your previous tool result instead of re-reading. If you need a different section, use a non-overlapping offset/limit.`,
+						alreadyReadRanges: priorRanges.map((r) => ({
+							startLine: r.start + 1,
+							endLine: r.end,
+						})),
+					};
+				}
 
-				readFiles.add(file_path);
+				const sliced = allLines.slice(startLine, endLine);
+
+				let truncatedLineCount = 0;
+				const clipped = sliced.map((line) => {
+					if (line.length > MAX_LINE_LENGTH) {
+						truncatedLineCount++;
+						return `${line.slice(0, MAX_LINE_LENGTH)}…[truncated ${line.length - MAX_LINE_LENGTH} chars]`;
+					}
+					return line;
+				});
+
+				const numbered = clipped.map((line, i) => `${startLine + i + 1}\t${line}`).join("\n");
+
+				fileReads.set(file_path, [...priorRanges, { start: startLine, end: endLine }]);
 
 				logger.debug(
-					`[tool:file_read] read ${sliced.length}/${totalLines} lines from ${file_path}`,
+					`[tool:file_read] read ${sliced.length}/${totalLines} lines from ${file_path}${truncatedLineCount ? ` (${truncatedLineCount} long lines clipped)` : ""}`,
 				);
 
 				return {
@@ -76,6 +113,7 @@ export function createFileTools() {
 					totalLines,
 					readLines: sliced.length,
 					truncated: startLine + sliced.length < totalLines,
+					...(truncatedLineCount > 0 && { truncatedLines: truncatedLineCount }),
 				};
 			} catch (err) {
 				const message = err instanceof Error ? err.message : String(err);
@@ -96,7 +134,7 @@ export function createFileTools() {
 			logger.debug(`[tool:file_write] path=${file_path} contentLen=${content.length}`);
 
 			// Safety gate: if file exists, must have been read first
-			if (existsSync(file_path) && !readFiles.has(file_path)) {
+			if (existsSync(file_path) && !fileReads.has(file_path)) {
 				return {
 					error: `File exists but has not been read. Please use file_read to read ${file_path} before writing.`,
 				};
@@ -110,9 +148,11 @@ export function createFileTools() {
 				}
 
 				await Bun.write(file_path, content);
-				readFiles.add(file_path);
-
 				const lines = content.split("\n").length;
+				// Post-write: file state is known, but prior read ranges no longer reflect disk state.
+				// Reset to a single range covering the new content so future edits pass the safety gate.
+				fileReads.set(file_path, [{ start: 0, end: lines }]);
+
 				logger.debug(`[tool:file_write] wrote ${lines} lines to ${file_path}`);
 
 				return { success: true, path: file_path, lines };
@@ -160,7 +200,7 @@ export function createFileTools() {
 			logger.debug(`[tool:file_edit] path=${file_path}`);
 
 			// Safety gate: must have been read first
-			if (!readFiles.has(file_path)) {
+			if (!fileReads.has(file_path)) {
 				return {
 					error: `File has not been read. Please use file_read to read ${file_path} before editing.`,
 				};
@@ -235,6 +275,8 @@ export function createFileTools() {
 					}
 
 					await Bun.write(file_path, newContent);
+					// Content and line numbers may have shifted — invalidate prior read ranges.
+					fileReads.set(file_path, [{ start: 0, end: newContent.split("\n").length }]);
 
 					logger.debug(`[tool:file_edit] string replace: ${count} occurrence(s) in ${file_path}`);
 
@@ -275,6 +317,8 @@ export function createFileTools() {
 				const result = [...before, ...newLines, ...after];
 
 				await Bun.write(file_path, result.join("\n"));
+				// Line range edit shifts subsequent line numbers — invalidate prior read ranges.
+				fileReads.set(file_path, [{ start: 0, end: result.length }]);
 
 				const removedCount = end_line - start_line + 1;
 				logger.debug(
