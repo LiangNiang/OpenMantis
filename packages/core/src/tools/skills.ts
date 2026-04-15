@@ -11,6 +11,20 @@ import { z } from "zod";
 const logger = createLogger("core/tools");
 const BROWSER_SKILL_NAME = "agent-browser";
 
+// `Bun.embeddedFiles` is non-empty only in a `--compile`d single-file executable.
+// Binary build → skills were embedded and extracted to SKILLS_DIR by initBuiltinSkills.
+// Dev (running from source) → read directly from the repo's `skills/` folder so
+// edits are picked up without a rebuild.
+// Hop count for the dev path: packages/core/src/tools → src → core → packages → repo root.
+function isCompiledBinary(): boolean {
+	return (Bun as any).embeddedFiles?.length > 0;
+}
+
+function resolveSkillsRoot(): string {
+	if (isCompiledBinary()) return SKILLS_DIR;
+	return path.resolve(import.meta.dir, "../../../../skills");
+}
+
 interface Skill {
 	name: string;
 	description: string;
@@ -253,11 +267,21 @@ export async function createSkillTools(config?: OpenMantisConfig) {
 	const skillsConfig = config?.skills;
 	let instructions = "";
 	const tools: Record<string, Tool> = {};
+	const skillsRoot = resolveSkillsRoot();
+	const binary = isCompiledBinary();
+	logger.debug(`[skills] root=${skillsRoot} mode=${binary ? "binary" : "dev"}`);
 
 	// Built-in skills
 	if (skillsConfig?.builtinEnabled !== false) {
-		const builtinDir = path.join(SKILLS_DIR, "builtin");
-		if (existsSync(builtinDir)) {
+		const builtinDir = path.join(skillsRoot, "builtin");
+		if (!existsSync(builtinDir)) {
+			logger.warn(
+				`[skills] builtin directory not found at ${builtinDir}. ` +
+					(binary
+						? "Embedded skill extraction may have failed; try `openmantis init --force`."
+						: "Are you running from the repo root?"),
+			);
+		} else {
 			try {
 				let skills = await discoverSkills(builtinDir, "skills/builtin");
 				if (config?.browser?.enabled !== true) {
@@ -279,7 +303,7 @@ export async function createSkillTools(config?: OpenMantisConfig) {
 	}
 
 	// Custom skills (skills/custom directory)
-	const customDir = path.join(SKILLS_DIR, "custom");
+	const customDir = path.join(skillsRoot, "custom");
 	if (existsSync(customDir)) {
 		try {
 			const skills = await discoverSkills(customDir, "skills/custom");

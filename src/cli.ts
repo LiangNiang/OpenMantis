@@ -4,19 +4,24 @@ import { initBuiltinSkills } from "./init";
 
 // Register embedded assets (generated at build time, only available in compiled binary)
 async function loadEmbeddedAssets() {
+	const isBinary = (Bun as any).embeddedFiles?.length > 0;
 	try {
 		// @ts-expect-error — generated at build time, not present during dev
 		const webMod = await import("./_web-assets.generated");
 		(globalThis as any).__EMBEDDED_WEB_ASSETS__ = webMod.WEB_ASSETS;
-	} catch {
-		// Dev mode — no generated file, web assets served from disk
+	} catch (err) {
+		// Dev: no generated file, web assets served from disk (expected).
+		// Binary: generated module failed to load — this is a real bug.
+		if (isBinary) console.error(`[cli] failed to load embedded web assets: ${err}`);
 	}
 	try {
 		// @ts-expect-error — generated at build time, not present during dev
 		const skillMod = await import("./_skill-files.generated");
 		(globalThis as any).__EMBEDDED_SKILL_FILES__ = skillMod.SKILL_FILES;
-	} catch {
-		// Dev mode — no generated file, skills loaded from disk
+	} catch (err) {
+		// Dev: no generated file, skills loaded from disk (expected).
+		// Binary: generated module failed to load — this is a real bug.
+		if (isBinary) console.error(`[cli] failed to load embedded skill files: ${err}`);
 	}
 }
 
