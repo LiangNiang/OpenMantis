@@ -105,5 +105,14 @@ export function logsRoutes() {
 		return c.body(file.stream());
 	});
 
+	app.delete("/", async (c) => {
+		const file = Bun.file(LOG_PATH);
+		if (!(await file.exists())) {
+			return c.body(null, 204);
+		}
+		await Bun.write(LOG_PATH, "");
+		return c.body(null, 204);
+	});
+
 	return app;
 }
