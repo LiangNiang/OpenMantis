@@ -200,9 +200,10 @@ export async function resolveTools(
 		}
 	}
 
-	// 始终注入消息发送工具（当 gateway 上下文可用时）
+	// 注入消息发送工具：需同时满足 gateway 上下文可用且调用方持有 channelCtx
+	// （send_message 依赖发送者身份；headless subagent 无 channelCtx，本就不该获得此能力）
 	const gateway = getGateway();
-	if (gateway) {
+	if (gateway && channelCtx) {
 		Object.assign(tools, createMessageTools());
 	}
 
