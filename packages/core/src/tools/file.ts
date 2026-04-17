@@ -8,7 +8,7 @@ const logger = createLogger("core/tools");
 const DEFAULT_READ_LIMIT = 2000;
 const MAX_LINE_LENGTH = 2000;
 const EDIT_CONTEXT_LINES = 5;
-const _FULL_CONTENT_LINE_THRESHOLD = 500;
+const FULL_CONTENT_LINE_THRESHOLD = 500;
 
 export const FILE_TOOL_GUIDE = `## File Tools Usage Guide
 
@@ -71,7 +71,7 @@ function editContextSnippet(allLines: string[], centerLine: number): string {
 		.join("\n");
 }
 
-function _formatFullContent(allLines: string[]): string {
+function formatFullContent(allLines: string[]): string {
 	return allLines.map((line, i) => `${i + 1}\t${line}`).join("\n");
 }
 
@@ -97,7 +97,7 @@ function countOccurrences(content: string, search: string): number {
 	return count;
 }
 
-function _applyStringReplace(
+function applyStringReplace(
 	content: string,
 	oldStr: string,
 	newStr: string,
@@ -139,7 +139,7 @@ function _applyStringReplace(
 	};
 }
 
-function _applyInsertAfter(
+function applyInsertAfter(
 	content: string,
 	anchor: string,
 	insertContent: string,
@@ -184,7 +184,7 @@ function _applyInsertAfter(
 	};
 }
 
-function _applyInsertBefore(
+function applyInsertBefore(
 	content: string,
 	anchor: string,
 	insertContent: string,
@@ -229,7 +229,7 @@ function _applyInsertBefore(
 	};
 }
 
-function _applyDelete(content: string, target: string, replaceAll: boolean): EditResult {
+function applyDelete(content: string, target: string, replaceAll: boolean): EditResult {
 	const count = countOccurrences(content, target);
 	if (count === 0) {
 		return {
@@ -263,7 +263,7 @@ function _applyDelete(content: string, target: string, replaceAll: boolean): Edi
 	};
 }
 
-function _detectEditType(edit: Record<string, unknown>): EditType | null {
+function detectEditType(edit: Record<string, unknown>): EditType | null {
 	if ("old_string" in edit && "new_string" in edit) return "string_replace";
 	if ("insert_after" in edit && "content" in edit) return "insert_after";
 	if ("insert_before" in edit && "content" in edit) return "insert_before";
@@ -394,89 +394,95 @@ export function createFileTools() {
 
 	const fileEdit = tool({
 		description:
-			"Edit file contents partially, avoiding full rewrites. Supports single or batch edits.\n\n**Single edit** (use top-level parameters):\n1. **String replacement**: provide old_string + new_string. old_string must be unique (unless replace_all: true).\n2. **Line range replacement**: provide start_line + end_line + new_content.\n\n**Batch edit** (use edits array): provide an array of {old_string, new_string, replace_all?} objects to apply multiple string replacements in one call. Edits are applied sequentially — each edit sees the result of previous ones. Do not mix batch with single-edit parameters.\n\nFile must have been read via file_read first. Returns a context snippet around each edit point for verification.",
+			"Edit one or more files in a single call. Supports multi-file batch edits with multiple edit primitives.\n\nProvide a `files` array where each entry has a `path` and an `edits` array. Edit types:\n1. **String replace**: `{ old_string, new_string, replace_all? }`\n2. **Insert after**: `{ insert_after, content, replace_all? }` — insert content after anchor text\n3. **Insert before**: `{ insert_before, content, replace_all? }` — insert content before anchor text\n4. **Delete**: `{ delete, replace_all? }` — remove target text\n5. **Line range**: `{ start_line, end_line, new_content }` — replace line range (must be the only edit for that file)\n\nEdits are applied sequentially per file. All files must have been read via file_read first. Files ≤ 500 lines return full content after edit; larger files return context snippets.",
 		inputSchema: z.object({
-			file_path: z.string().describe("Absolute path to the file"),
-			// String replacement mode
-			old_string: z.string().optional().describe("Text to replace (string replacement mode)"),
-			new_string: z.string().optional().describe("Replacement text (string replacement mode)"),
-			replace_all: z
-				.boolean()
-				.optional()
-				.default(false)
-				.describe("Replace all occurrences, defaults to false (string replacement mode)"),
-			// Line range mode
-			start_line: z.number().optional().describe("Start line number, 1-based (line range mode)"),
-			end_line: z
-				.number()
-				.optional()
-				.describe("End line number, 1-based, inclusive (line range mode)"),
-			new_content: z
-				.string()
-				.optional()
-				.describe("New content to replace the line range (line range mode)"),
-			// Batch mode
-			edits: z
-				.array(
-					z.object({
-						old_string: z.string().describe("Text to replace"),
-						new_string: z.string().describe("Replacement text"),
-						replace_all: z.boolean().optional().default(false).describe("Replace all occurrences"),
-					}),
-				)
-				.optional()
-				.describe(
-					"Array of string replacements to apply sequentially in one call. Cannot be mixed with single-edit parameters.",
-				),
+			files: z.array(
+				z.object({
+					path: z.string().describe("Absolute path to the file"),
+					edits: z.array(
+						z.union([
+							z.object({
+								old_string: z.string().describe("Text to find and replace"),
+								new_string: z.string().describe("Replacement text"),
+								replace_all: z
+									.boolean()
+									.optional()
+									.default(false)
+									.describe("Replace all occurrences"),
+							}),
+							z.object({
+								insert_after: z.string().describe("Anchor text to insert after"),
+								content: z.string().describe("Content to insert after the anchor"),
+								replace_all: z
+									.boolean()
+									.optional()
+									.default(false)
+									.describe("Apply at all occurrences of the anchor"),
+							}),
+							z.object({
+								insert_before: z.string().describe("Anchor text to insert before"),
+								content: z.string().describe("Content to insert before the anchor"),
+								replace_all: z
+									.boolean()
+									.optional()
+									.default(false)
+									.describe("Apply at all occurrences of the anchor"),
+							}),
+							z.object({
+								delete: z.string().describe("Text to delete"),
+								replace_all: z
+									.boolean()
+									.optional()
+									.default(false)
+									.describe("Delete all occurrences"),
+							}),
+							z.object({
+								start_line: z.number().describe("Start line number, 1-based (line range mode)"),
+								end_line: z
+									.number()
+									.describe("End line number, 1-based, inclusive (line range mode)"),
+								new_content: z.string().describe("New content to replace the line range"),
+							}),
+						]),
+					),
+				}),
+			),
 		}),
-		execute: async ({
-			file_path,
-			old_string,
-			new_string,
-			replace_all,
-			start_line,
-			end_line,
-			new_content,
-			edits,
-		}) => {
-			logger.debug(`[tool:file_edit] path=${file_path}`);
+		execute: async ({ files }) => {
+			logger.debug(`[tool:file_edit] editing ${files.length} file(s)`);
 
-			// Safety gate: must have been read first
-			if (!fileReads.has(file_path)) {
-				return {
-					error: `File has not been read. Please use file_read to read ${file_path} before editing.`,
-				};
+			// Pre-flight: check all files have been read and exist
+			const preflightErrors: string[] = [];
+			for (const f of files) {
+				if (!fileReads.has(f.path)) {
+					preflightErrors.push(`File has not been read: ${f.path}. Use file_read first.`);
+				} else if (!existsSync(f.path)) {
+					preflightErrors.push(`File not found: ${f.path}`);
+				}
+			}
+			if (preflightErrors.length > 0) {
+				return { success: false, errors: preflightErrors };
 			}
 
-			if (!existsSync(file_path)) {
-				return { error: `File not found: ${file_path}` };
-			}
+			const fileResults: Array<{
+				path: string;
+				success: boolean;
+				applied: number;
+				failed: number;
+				results: Array<{
+					index: number;
+					success: boolean;
+					replacements?: number;
+					context?: string;
+					error?: string;
+				}>;
+				fullContent?: string;
+			}> = [];
 
-			// Determine mode
-			const hasStringMode = old_string !== undefined;
-			const hasLineMode = start_line !== undefined || end_line !== undefined;
-			const hasBatchMode = edits !== undefined && edits.length > 0;
-
-			const modeCount = [hasStringMode, hasLineMode, hasBatchMode].filter(Boolean).length;
-			if (modeCount > 1) {
-				return {
-					error:
-						"Cannot mix edit modes. Use exactly one of: (1) old_string + new_string, (2) start_line + end_line + new_content, (3) edits array.",
-				};
-			}
-			if (modeCount === 0) {
-				return {
-					error:
-						"Provide old_string + new_string (string replacement), start_line + end_line + new_content (line range), or edits array (batch).",
-				};
-			}
-
-			try {
-				let content = await Bun.file(file_path).text();
-
-				// --- Batch mode ---
-				if (hasBatchMode) {
-					const results: Array<{
+			for (const f of files) {
+				try {
+					let content = await Bun.file(f.path).text();
+					const editResults: Array<{
 						index: number;
 						success: boolean;
 						replacements?: number;
@@ -484,205 +490,188 @@ export function createFileTools() {
 						error?: string;
 					}> = [];
 
-					for (let i = 0; i < edits.length; i++) {
-						const edit = edits[i]!;
-						if (edit.old_string === edit.new_string) {
-							results.push({
-								index: i,
-								success: false,
-								error: "old_string and new_string must be different.",
-							});
-							continue;
-						}
-
-						let count = 0;
-						let searchFrom = 0;
-						while (true) {
-							const idx = content.indexOf(edit.old_string, searchFrom);
-							if (idx === -1) break;
-							count++;
-							searchFrom = idx + edit.old_string.length;
-						}
-
-						if (count === 0) {
-							results.push({
-								index: i,
-								success: false,
-								error: `old_string not found: ${edit.old_string.slice(0, 80)}${edit.old_string.length > 80 ? "..." : ""}`,
-							});
-							continue;
-						}
-
-						if (!edit.replace_all && count > 1) {
-							results.push({
-								index: i,
-								success: false,
-								error: `old_string found ${count} times (not unique). Add context or set replace_all: true.`,
-							});
-							continue;
-						}
-
-						if (edit.replace_all) {
-							content = content.replaceAll(edit.old_string, edit.new_string);
-						} else {
-							const idx = content.indexOf(edit.old_string);
-							content =
-								content.slice(0, idx) +
-								edit.new_string +
-								content.slice(idx + edit.old_string.length);
-						}
-
-						// Compute context snippet around first replacement
-						const newLines = content.split("\n");
-						const editIdx = content.indexOf(edit.new_string);
-						const centerLine =
-							editIdx >= 0
-								? content.slice(0, editIdx + edit.new_string.length / 2).split("\n").length - 1
-								: 0;
-
-						results.push({
-							index: i,
-							success: true,
-							replacements: edit.replace_all ? count : 1,
-							context: editContextSnippet(newLines, centerLine),
+					// Check for line_range mixing: if any edit is line_range and there are multiple edits, error
+					const hasLineRange = f.edits.some((e) => {
+						const rec = e as Record<string, unknown>;
+						return "start_line" in rec && "end_line" in rec;
+					});
+					if (hasLineRange && f.edits.length > 1) {
+						fileResults.push({
+							path: f.path,
+							success: false,
+							applied: 0,
+							failed: f.edits.length,
+							results: [
+								{
+									index: 0,
+									success: false,
+									error:
+										"line_range edits cannot be mixed with other edits. Use a separate file entry for line_range.",
+								},
+							],
 						});
+						continue;
 					}
 
-					const successCount = results.filter((r) => r.success).length;
-					if (successCount > 0) {
-						await Bun.write(file_path, content);
-						fileReads.set(file_path, []);
+					for (let i = 0; i < f.edits.length; i++) {
+						const edit = f.edits[i] as Record<string, unknown>;
+						const editType = detectEditType(edit);
+
+						if (!editType) {
+							editResults.push({
+								index: i,
+								success: false,
+								error:
+									"Unknown edit type. Provide one of: old_string+new_string, insert_after+content, insert_before+content, delete, or start_line+end_line+new_content.",
+							});
+							continue;
+						}
+
+						let result: EditResult;
+
+						switch (editType) {
+							case "string_replace": {
+								const oldStr = edit.old_string as string;
+								const newStr = edit.new_string as string;
+								if (oldStr === newStr) {
+									editResults.push({
+										index: i,
+										success: false,
+										error: "old_string and new_string must be different.",
+									});
+									continue;
+								}
+								result = applyStringReplace(
+									content,
+									oldStr,
+									newStr,
+									(edit.replace_all as boolean) ?? false,
+								);
+								break;
+							}
+							case "insert_after": {
+								result = applyInsertAfter(
+									content,
+									edit.insert_after as string,
+									edit.content as string,
+									(edit.replace_all as boolean) ?? false,
+								);
+								break;
+							}
+							case "insert_before": {
+								result = applyInsertBefore(
+									content,
+									edit.insert_before as string,
+									edit.content as string,
+									(edit.replace_all as boolean) ?? false,
+								);
+								break;
+							}
+							case "delete": {
+								result = applyDelete(
+									content,
+									edit.delete as string,
+									(edit.replace_all as boolean) ?? false,
+								);
+								break;
+							}
+							case "line_range": {
+								const startLine = edit.start_line as number;
+								const endLine = edit.end_line as number;
+								const newContent = edit.new_content as string;
+								const lines = content.split("\n");
+								const totalLines = lines.length;
+
+								if (startLine < 1 || startLine > totalLines) {
+									editResults.push({
+										index: i,
+										success: false,
+										error: `start_line ${startLine} out of range (file has ${totalLines} lines).`,
+									});
+									continue;
+								}
+								if (endLine < startLine || endLine > totalLines) {
+									editResults.push({
+										index: i,
+										success: false,
+										error: `end_line ${endLine} invalid (start_line=${startLine}, file has ${totalLines} lines).`,
+									});
+									continue;
+								}
+
+								const before = lines.slice(0, startLine - 1);
+								const after = lines.slice(endLine);
+								const newLines = newContent.split("\n");
+								const resultLines = [...before, ...newLines, ...after];
+								const centerLine = before.length + Math.floor(newLines.length / 2);
+
+								result = {
+									success: true,
+									content: resultLines.join("\n"),
+									replacements: 1,
+									centerLine,
+								};
+								break;
+							}
+						}
+
+						if (result.success && result.content) {
+							content = result.content;
+							const allLines = content.split("\n");
+							editResults.push({
+								index: i,
+								success: true,
+								replacements: result.replacements,
+								context: editContextSnippet(allLines, result.centerLine ?? 0),
+							});
+						} else {
+							editResults.push({
+								index: i,
+								success: false,
+								error: result.error,
+							});
+						}
 					}
+
+					const successCount = editResults.filter((r) => r.success).length;
+					if (successCount > 0) {
+						await Bun.write(f.path, content);
+						fileReads.set(f.path, []);
+					}
+
+					const allLines = content.split("\n");
+					const fileResult: (typeof fileResults)[number] = {
+						path: f.path,
+						success: successCount > 0,
+						applied: successCount,
+						failed: f.edits.length - successCount,
+						results: editResults,
+					};
+
+					if (successCount > 0 && allLines.length <= FULL_CONTENT_LINE_THRESHOLD) {
+						fileResult.fullContent = formatFullContent(allLines);
+					}
+
+					fileResults.push(fileResult);
 
 					logger.debug(
-						`[tool:file_edit] batch: ${successCount}/${edits.length} edits applied in ${file_path}`,
+						`[tool:file_edit] ${f.path}: ${successCount}/${f.edits.length} edits applied`,
 					);
-
-					return {
-						success: successCount > 0,
-						mode: "batch",
-						totalEdits: edits.length,
-						applied: successCount,
-						failed: edits.length - successCount,
-						results,
-					};
+				} catch (err) {
+					const message = err instanceof Error ? err.message : String(err);
+					logger.debug(`[tool:file_edit] error on ${f.path}: ${message}`);
+					fileResults.push({
+						path: f.path,
+						success: false,
+						applied: 0,
+						failed: f.edits.length,
+						results: [{ index: 0, success: false, error: message }],
+					});
 				}
-
-				// --- Single string replacement mode ---
-				if (hasStringMode) {
-					if (new_string === undefined) {
-						return {
-							error: "String replacement mode requires both old_string and new_string.",
-						};
-					}
-					if (old_string === new_string) {
-						return { error: "old_string and new_string must be different." };
-					}
-
-					let count = 0;
-					let searchFrom = 0;
-					while (true) {
-						const idx = content.indexOf(old_string!, searchFrom);
-						if (idx === -1) break;
-						count++;
-						searchFrom = idx + old_string!.length;
-					}
-
-					if (count === 0) {
-						return {
-							error:
-								"old_string not found in file. Check that the text matches exactly (including whitespace and indentation).",
-						};
-					}
-
-					if (!replace_all && count > 1) {
-						return {
-							error: `old_string found ${count} times in file (not unique). Include more surrounding context to make it unique, or set replace_all: true to replace all occurrences.`,
-						};
-					}
-
-					let newContent: string;
-					if (replace_all) {
-						newContent = content.replaceAll(old_string!, new_string);
-					} else {
-						const idx = content.indexOf(old_string!);
-						newContent =
-							content.slice(0, idx) + new_string + content.slice(idx + old_string!.length);
-					}
-
-					await Bun.write(file_path, newContent);
-					fileReads.set(file_path, []);
-
-					// Generate context snippet around the edit point
-					const newLines = newContent.split("\n");
-					const editIdx = newContent.indexOf(new_string);
-					const centerLine =
-						editIdx >= 0
-							? newContent.slice(0, editIdx + new_string.length / 2).split("\n").length - 1
-							: 0;
-
-					logger.debug(`[tool:file_edit] string replace: ${count} occurrence(s) in ${file_path}`);
-
-					return {
-						success: true,
-						replacements: replace_all ? count : 1,
-						mode: "string_replace",
-						context: editContextSnippet(newLines, centerLine),
-					};
-				}
-
-				// --- Line range mode ---
-				if (start_line === undefined || end_line === undefined) {
-					return {
-						error: "Line range mode requires both start_line and end_line.",
-					};
-				}
-				if (new_content === undefined) {
-					return { error: "Line range mode requires new_content." };
-				}
-
-				const lines = content.split("\n");
-				const totalLines = lines.length;
-
-				if (start_line < 1 || start_line > totalLines) {
-					return {
-						error: `start_line ${start_line} out of range (file has ${totalLines} lines).`,
-					};
-				}
-				if (end_line < start_line || end_line > totalLines) {
-					return {
-						error: `end_line ${end_line} invalid (start_line=${start_line}, file has ${totalLines} lines).`,
-					};
-				}
-
-				const before = lines.slice(0, start_line - 1);
-				const after = lines.slice(end_line);
-				const newLines = new_content.split("\n");
-				const result = [...before, ...newLines, ...after];
-
-				await Bun.write(file_path, result.join("\n"));
-				fileReads.set(file_path, []);
-
-				const removedCount = end_line - start_line + 1;
-				// Context around the middle of the inserted block
-				const centerLine = before.length + Math.floor(newLines.length / 2);
-
-				logger.debug(
-					`[tool:file_edit] line range: replaced lines ${start_line}-${end_line} (${removedCount} -> ${newLines.length}) in ${file_path}`,
-				);
-
-				return {
-					success: true,
-					mode: "line_range",
-					removedLines: removedCount,
-					insertedLines: newLines.length,
-					context: editContextSnippet(result, centerLine),
-				};
-			} catch (err) {
-				const message = err instanceof Error ? err.message : String(err);
-				logger.debug(`[tool:file_edit] error: ${message}`);
-				return { error: message };
 			}
+
+			const overallSuccess = fileResults.some((f) => f.success);
+			return { success: overallSuccess, files: fileResults };
 		},
 	});
 
