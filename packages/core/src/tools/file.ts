@@ -14,44 +14,42 @@ export const FILE_TOOL_GUIDE = `## File Tools Usage Guide
 
 **Important:** Use file_read / file_write / file_edit for all file operations instead of bash commands (cat/head/tail/echo/sed/awk). These dedicated tools return structured results and significantly reduce token usage.
 
-### Efficiency principles
+### Efficiency Principles
 
-1. **Minimize tool calls.** When you need to make multiple changes to the same file, **always use batch mode** (edits array) instead of separate file_edit calls. This saves round trips and I/O.
-2. **Trust the context snippet.** Every successful file_edit returns a context snippet showing lines around the edit point. Use it to verify the result and to construct the next edit's old_string — **do NOT file_read between consecutive edits** unless you truly need a different region of the file that isn't covered by prior reads or snippets.
-3. **Plan all edits upfront.** After reading a file, identify all changes needed, then apply them in a single batch file_edit call. Do not read → edit → read → edit in a loop.
+1. **Read all files first, plan all edits, then one file_edit call.** file_edit accepts a \`files\` array — edit multiple files in a single call. Read everything you need, figure out all changes, then batch them.
+2. **Don't re-read after edits on small files.** Files with ≤ ${FULL_CONTENT_LINE_THRESHOLD} lines return full numbered content after a successful edit. Use that to verify and plan further edits — no file_read needed.
+3. **Pick the right edit operation:** \`old_string + new_string\` for replacement, \`insert_after\` / \`insert_before\` for adding code near an anchor, \`delete\` for removal, \`start_line + end_line + new_content\` for large contiguous block replacement.
 
 ### file_read — Read files
-- No need to check if a file exists before reading — just read it; the tool returns an error if not found.
-- When you already know which part of the file you need, use offset/limit to read only that section. This saves tokens on large files.
-- **Never re-read a range you already read in this session.** The tool tracks read ranges per file and will reject any request whose \`[offset, offset+limit)\` is fully covered by a prior read (unless the file was modified via file_write/file_edit since). Reuse the content from your earlier tool result instead of re-reading. If you need additional context around a match from content_search, pick an offset/limit that extends *beyond* what you previously read.
-- After a successful file_edit or file_write, the read tracking is reset so a fresh read is allowed if truly needed — but in most cases the edit's **context snippet** is sufficient. Only re-read if you need to see a large portion of the updated file.
-- Output format is \`lineNumber\\tcontact\` (line numbers start at 1). Note: the line number prefix is NOT part of the file content — do not include it when referencing text in file_edit.
-- Lines longer than ${MAX_LINE_LENGTH} characters are clipped to \`…[truncated N chars]\`. If you need to file_edit such a line, use line range mode (start_line/end_line + new_content) instead of string matching — the clipped text won't match the file on disk.
-- For Word-export HTML, XML with inline styles, minified JS/CSS, or other files with extremely long lines: prefer content_search (grep) to locate keywords first, then file_read a narrow offset/limit window around the match.
+- Just read; returns error if not found. Use offset/limit for large files.
+- **Never re-read a range already read** — the tool rejects redundant reads. Reuse prior output.
+- After file_edit/file_write, read tracking resets. But for files ≤ ${FULL_CONTENT_LINE_THRESHOLD} lines the edit response already includes full content, so re-read is usually unnecessary.
+- Output format: \`lineNumber\\tcontent\` (1-based). Do NOT include line number prefixes in file_edit strings.
+- Lines longer than ${MAX_LINE_LENGTH} characters are clipped. Use line range mode for such lines — clipped text won't match.
 
 ### file_write — Write files
-- Use ONLY for **creating new files** or **complete rewrites**. To modify existing files, **prefer file_edit** — it only transmits the changed portion, saving tokens.
-- Overwriting an existing file requires a prior file_read of that file, otherwise the write is rejected. This prevents blindly overwriting important content.
-- Parent directories are created automatically if they don't exist.
+- **Only for new files or complete rewrites.** Prefer file_edit for partial changes.
+- Existing files require a prior file_read. Parent directories are created automatically.
 
 ### file_edit — Edit files
-- Requires a prior file_read of the target file before editing.
-- Every successful edit returns a **context snippet** (a few lines around the edit point) so you can verify the result without re-reading the file. Use this snippet to chain edits confidently.
-- **Batch mode (preferred for multiple changes):** provide an \`edits\` array of \`{old_string, new_string, replace_all?}\` objects.
-  - **Always prefer batch mode when you have 2+ changes to the same file.** Collect all intended edits and submit them in one call.
-  - All edits are applied sequentially in one call — each edit sees the result of previous ones. So you can first rename a type and later edits can reference the new name.
-  - Single read + single write, much more efficient than multiple separate calls.
-  - Each edit in the batch returns its own context snippet and success/error status.
-  - If some edits fail, the successful ones are still applied. Check the \`results\` array.
-- **String replacement mode** (single edit): provide old_string + new_string.
-  - old_string must **exactly match** the text in the file, including indentation (tabs/spaces) and newlines.
-  - When copying text from file_read output, **do NOT include the line number prefix** — only use the actual content after the tab.
-  - By default, old_string must be unique in the file. If not unique, include more surrounding context (a few extra lines) to make it unique, or use replace_all: true to replace all occurrences.
-  - Good for: renaming variables (replace_all), modifying function implementations, fixing bugs, adding/removing code sections.
-- **Line range mode** (single edit): provide start_line + end_line + new_content.
-  - Line numbers are 1-based; end_line is inclusive.
-  - Good for: replacing large contiguous blocks, inserting content at a precise location.
-  - Note: if prior edits changed the line count, line numbers may have shifted — re-read with file_read to confirm.`;
+All target files must have been read via file_read first.
+
+**Schema:** \`{ files: [{ path, edits: [...] }, ...] }\`
+
+Each entry in \`edits\` is one of five types:
+1. **String replace:** \`{ old_string, new_string, replace_all? }\` — old_string must exactly match (including whitespace). Must be unique unless replace_all: true.
+2. **Insert after:** \`{ insert_after, content, replace_all? }\` — finds anchor text, inserts content after it (auto-adds newline separator if needed).
+3. **Insert before:** \`{ insert_before, content, replace_all? }\` — finds anchor text, inserts content before it (auto-adds newline separator if needed).
+4. **Delete:** \`{ delete, replace_all? }\` — removes the target text. Must be unique unless replace_all: true.
+5. **Line range:** \`{ start_line, end_line, new_content }\` — replaces lines (1-based, inclusive). Must be the **only** edit for that file entry.
+
+**Execution:** Edits are applied sequentially per file — each edit sees the result of previous ones. If some edits fail, successful ones are still applied. Check the \`results\` array per file.
+
+**Response behavior:**
+- Files ≤ ${FULL_CONTENT_LINE_THRESHOLD} lines: response includes \`fullContent\` (numbered) after edit — use it instead of re-reading.
+- Files > ${FULL_CONTENT_LINE_THRESHOLD} lines: response includes a context snippet per edit for verification.
+
+**Best practice:** Collect all changes across all files into a single file_edit call. Use insert_after/insert_before for adding new code blocks (avoids needing to match surrounding context). Use delete for clean removal without crafting a replacement string.`;
 
 type ReadRange = { start: number; end: number };
 
