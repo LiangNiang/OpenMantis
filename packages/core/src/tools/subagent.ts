@@ -60,6 +60,12 @@ const semaphore = new Semaphore(MAX_CONCURRENCY);
 
 const depthStorage = new AsyncLocalStorage<{ depth: number }>();
 
+let dispatchCounter = 0;
+function nextDispatchId(): string {
+	dispatchCounter = (dispatchCounter + 1) % 1_000_000;
+	return dispatchCounter.toString(36).padStart(4, "0");
+}
+
 export const SUBAGENT_TOOL_GUIDE =
 	"- **subagent**: Dispatch a fresh, context-isolated child agent to execute an independent task. " +
 	"Use for (a) long/complex subtasks you don't want polluting your own context, " +
@@ -91,23 +97,42 @@ export function createSubagentTools(config: OpenMantisConfig): Record<string, To
 			options?: { abortSignal?: AbortSignal },
 		) => {
 			const parentSignal = options?.abortSignal;
+			const id = nextDispatchId();
+			const promptPrefix = prompt.slice(0, 100).replace(/\s+/g, " ");
 
 			const current = depthStorage.getStore();
 			const depth = current?.depth ?? 0;
 			if (depth >= MAX_DEPTH) {
+				logger.debug(
+					`[subagent#${id}] rejected: depth=${depth} >= max=${MAX_DEPTH} prompt="${promptPrefix}"`,
+				);
 				return {
 					success: false,
 					error: `Max subagent depth (${MAX_DEPTH}) exceeded. Cannot dispatch from a grandchild agent.`,
 				};
 			}
 
+			logger.debug(
+				`[subagent#${id}] dispatching depth=${depth + 1} provider=${provider ?? "default"} ` +
+					`systemPrompt=${systemPrompt ? "custom" : "default"} prompt="${promptPrefix}"`,
+			);
+
+			const queueWaitStart = Date.now();
 			await semaphore.acquire();
+			const queueWaitMs = Date.now() - queueWaitStart;
+			if (queueWaitMs > 50) {
+				logger.debug(`[subagent#${id}] queued ${queueWaitMs}ms for semaphore slot`);
+			}
+
 			const started = Date.now();
 			const timeoutCtrl = new AbortController();
 			const linkedSignal = parentSignal
 				? AbortSignal.any([parentSignal, timeoutCtrl.signal])
 				: timeoutCtrl.signal;
-			const timer = setTimeout(() => timeoutCtrl.abort(), TIMEOUT_MS);
+			const timer = setTimeout(() => {
+				logger.debug(`[subagent#${id}] timer fired after ${TIMEOUT_MS}ms, aborting`);
+				timeoutCtrl.abort();
+			}, TIMEOUT_MS);
 
 			try {
 				const factory = new AgentFactory(config);
@@ -125,27 +150,30 @@ export function createSubagentTools(config: OpenMantisConfig): Record<string, To
 				);
 
 				logger.debug(
-					`[subagent] depth=${depth + 1} provider=${provider ?? "default"} ` +
-						`prompt="${prompt.slice(0, 100).replace(/\s+/g, " ")}" ` +
+					`[subagent#${id}] completed depth=${depth + 1} provider=${provider ?? "default"} ` +
 						`duration=${Date.now() - started}ms steps=${result.steps.length} success=true`,
 				);
 				return { success: true, text: result.text };
 			} catch (err) {
 				const message = err instanceof Error ? err.message : String(err);
+				const duration = Date.now() - started;
 
 				if (parentSignal?.aborted) {
+					logger.debug(`[subagent#${id}] aborted by parent after ${duration}ms`);
 					throw err;
 				}
 
 				if (timeoutCtrl.signal.aborted) {
-					logger.warn(`[subagent] timeout after ${TIMEOUT_MS}ms`);
+					logger.warn(
+						`[subagent#${id}] timed out: observed abort after ${duration}ms (timer limit ${TIMEOUT_MS}ms)`,
+					);
 					return {
 						success: false,
 						error: `Subagent timed out after ${TIMEOUT_MS / 1000}s`,
 					};
 				}
 
-				logger.warn(`[subagent] failed: ${message}`);
+				logger.warn(`[subagent#${id}] failed after ${duration}ms: ${message}`);
 				return { success: false, error: `Subagent failed: ${message}` };
 			} finally {
 				clearTimeout(timer);
