@@ -1,5 +1,16 @@
 // packages/web/src/pages/logs.tsx
 import { memo, useCallback, useEffect, useRef, useState } from "react";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+	AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useLogStream } from "@/hooks/use-log-stream";
@@ -33,6 +44,18 @@ const LogLine = memo(function LogLine({ line }: { line: string }) {
 export function LogsPage() {
 	const { t } = useLocale();
 	const { lines, paused, bufferedCount, status, pause, resume, clear } = useLogStream();
+	const [clearing, setClearing] = useState(false);
+
+	const clearFile = useCallback(async () => {
+		setClearing(true);
+		try {
+			await fetch("/api/logs", { method: "DELETE" });
+			clear();
+		} finally {
+			setClearing(false);
+		}
+	}, [clear]);
+
 	const rootRef = useRef<HTMLDivElement>(null);
 	const viewportRef = useRef<HTMLDivElement | null>(null);
 	const followRef = useRef(true);
@@ -143,6 +166,25 @@ export function LogsPage() {
 					<Button variant="outline" size="sm" onClick={clear}>
 						{t("logs.clear")}
 					</Button>
+					<AlertDialog>
+						<AlertDialogTrigger asChild>
+							<Button variant="outline" size="sm" disabled={clearing}>
+								{t("logs.clearFile")}
+							</Button>
+						</AlertDialogTrigger>
+						<AlertDialogContent>
+							<AlertDialogHeader>
+								<AlertDialogTitle>{t("logs.clearFileTitle")}</AlertDialogTitle>
+								<AlertDialogDescription>{t("logs.clearFileDesc")}</AlertDialogDescription>
+							</AlertDialogHeader>
+							<AlertDialogFooter>
+								<AlertDialogCancel>{t("logs.clearFileCancel")}</AlertDialogCancel>
+								<AlertDialogAction onClick={clearFile}>
+									{t("logs.clearFileConfirm")}
+								</AlertDialogAction>
+							</AlertDialogFooter>
+						</AlertDialogContent>
+					</AlertDialog>
 					<Button variant="outline" size="sm" asChild>
 						<a href="/api/logs/download" download>
 							{t("logs.download")}
