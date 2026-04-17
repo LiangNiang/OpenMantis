@@ -6,7 +6,7 @@ import {
 import { createLogger } from "@openmantis/common/logger";
 import { MESSAGE_SOURCE } from "@openmantis/common/types/channels";
 import { type ModelMessage, stepCountIs, type Tool, ToolLoopAgent, wrapLanguageModel } from "ai";
-import { type ChannelToolProviders, resolveTools } from "../tools";
+import { ALL_TOOL_GROUPS, type ChannelToolProviders, resolveTools } from "../tools";
 import { memoryStore } from "../tools/memory";
 
 const logger = createLogger("core/agent");
@@ -23,6 +23,12 @@ export interface CreateAgentOptions {
 	channelId?: string;
 	routeId?: string;
 	metadata?: Record<string, unknown>;
+}
+
+export interface CreateHeadlessOptions {
+	systemPrompt: string;
+	provider?: string;
+	allowedToolGroups: string[];
 }
 
 export interface CreateAgentResult {
@@ -127,6 +133,60 @@ export class AgentFactory {
 						typeof tc.input === "object" ? JSON.stringify(tc.input).slice(0, 200) : tc.input;
 					const output = toolResult ? JSON.stringify(toolResult.output).slice(0, 200) : "no result";
 					logger.debug(`[agent] tool:${tc.toolName} ${input} → ${output}`);
+				}
+			},
+		});
+		return { agent };
+	}
+
+	async createHeadless(options: CreateHeadlessOptions): Promise<CreateAgentResult> {
+		const providerConfig = resolveProvider(this.config, options.provider);
+		const modelConfig: ModelConfig = providerConfig.models[0]!;
+		const model = await createLanguageModel(providerConfig, modelConfig);
+		const thinkingOpts = resolveThinkingOptions(providerConfig, modelConfig);
+
+		let wrappedModel = model;
+		if (thinkingOpts.middleware) {
+			wrappedModel = wrapLanguageModel({
+				model: wrappedModel,
+				middleware: thinkingOpts.middleware,
+			});
+		}
+
+		const excludeGroups = Array.from(
+			new Set([
+				...ALL_TOOL_GROUPS.filter((g) => !options.allowedToolGroups.includes(g)),
+				...(this.config.excludeTools ?? []),
+			]),
+		);
+
+		const { tools } = await resolveTools(excludeGroups, this.config);
+
+		const maxSteps = this.config.maxToolRoundtrips;
+
+		if (process.env.DEBUG_PROMPT === "true") {
+			logger.debug("[agent:headless] System prompt:", options.systemPrompt);
+		}
+
+		const agent = new ToolLoopAgent({
+			model: wrappedModel,
+			instructions: options.systemPrompt,
+			tools,
+			toolChoice: "auto",
+			stopWhen: stepCountIs(maxSteps),
+			providerOptions: {
+				...(thinkingOpts.providerOptions ?? {}),
+				...(modelConfig.providerOptions ?? {}),
+			} as any,
+			temperature: modelConfig.temperature,
+			topP: modelConfig.topP,
+			onStepFinish: (event) => {
+				for (const tc of event.toolCalls) {
+					const toolResult = event.toolResults.find((tr) => tr.toolCallId === tc.toolCallId);
+					const input =
+						typeof tc.input === "object" ? JSON.stringify(tc.input).slice(0, 200) : tc.input;
+					const output = toolResult ? JSON.stringify(toolResult.output).slice(0, 200) : "no result";
+					logger.debug(`[agent:headless] tool:${tc.toolName} ${input} → ${output}`);
 				}
 			},
 		});

@@ -49,7 +49,7 @@ export type ChannelToolProvider = (
 
 export type ChannelToolProviders = Record<string, ChannelToolProvider>;
 
-const ALL_TOOL_GROUPS = [
+export const ALL_TOOL_GROUPS = [
 	"bash",
 	"file",
 	"search",
