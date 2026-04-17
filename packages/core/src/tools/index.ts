@@ -16,6 +16,7 @@ import { createRssTools } from "./rss";
 import { createScheduleTools, SCHEDULE_TOOL_GUIDE } from "./schedule";
 import { createSearchTools, SEARCH_TOOL_GUIDE } from "./search";
 import { createSkillTools, SKILLS_TOOL_GUIDE } from "./skills";
+import { createSubagentTools, SUBAGENT_TOOL_GUIDE } from "./subagent";
 import { createTavilyTools, TAVILY_TOOL_GUIDE } from "./tavily";
 import { createTtsTools } from "./tts";
 import { createWhisperTools } from "./whisper";
@@ -61,6 +62,7 @@ export const ALL_TOOL_GROUPS = [
 	"whisper",
 	"tts",
 	"memory",
+	"subagent",
 ] as const;
 
 export async function resolveTools(
@@ -165,6 +167,15 @@ export async function resolveTools(
 				guides.push(MEMORY_TOOL_GUIDE);
 				break;
 			}
+			case "subagent": {
+				if (!config) {
+					logger.warn("[resolveTools] subagent tool group requires config");
+					break;
+				}
+				Object.assign(tools, createSubagentTools(config));
+				guides.push(SUBAGENT_TOOL_GUIDE);
+				break;
+			}
 		}
 	}
 
@@ -206,6 +217,7 @@ export { createRssTools } from "./rss";
 export { createScheduleTools } from "./schedule";
 export { createSearchTools } from "./search";
 export { createSkillTools } from "./skills";
+export { createSubagentTools } from "./subagent";
 export { createTavilyTools } from "./tavily";
 export { createTtsTools } from "./tts";
 export { createWhisperTools } from "./whisper";
