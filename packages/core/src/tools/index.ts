@@ -16,6 +16,7 @@ import { createRssTools } from "./rss";
 import { createScheduleTools, SCHEDULE_TOOL_GUIDE } from "./schedule";
 import { createSearchTools, SEARCH_TOOL_GUIDE } from "./search";
 import { createSkillTools, SKILLS_TOOL_GUIDE } from "./skills";
+import { createSubagentTools, SUBAGENT_TOOL_GUIDE } from "./subagent";
 import { createTavilyTools, TAVILY_TOOL_GUIDE } from "./tavily";
 import { createTtsTools } from "./tts";
 import { createWhisperTools } from "./whisper";
@@ -49,7 +50,7 @@ export type ChannelToolProvider = (
 
 export type ChannelToolProviders = Record<string, ChannelToolProvider>;
 
-const ALL_TOOL_GROUPS = [
+export const ALL_TOOL_GROUPS = [
 	"bash",
 	"file",
 	"search",
@@ -61,6 +62,7 @@ const ALL_TOOL_GROUPS = [
 	"whisper",
 	"tts",
 	"memory",
+	"subagent",
 ] as const;
 
 export async function resolveTools(
@@ -165,6 +167,15 @@ export async function resolveTools(
 				guides.push(MEMORY_TOOL_GUIDE);
 				break;
 			}
+			case "subagent": {
+				if (!config) {
+					logger.warn("[resolveTools] subagent tool group requires config");
+					break;
+				}
+				Object.assign(tools, createSubagentTools(config));
+				guides.push(SUBAGENT_TOOL_GUIDE);
+				break;
+			}
 		}
 	}
 
@@ -189,9 +200,10 @@ export async function resolveTools(
 		}
 	}
 
-	// 始终注入消息发送工具（当 gateway 上下文可用时）
+	// 注入消息发送工具：需同时满足 gateway 上下文可用且调用方持有 channelCtx
+	// （send_message 依赖发送者身份；headless subagent 无 channelCtx，本就不该获得此能力）
 	const gateway = getGateway();
-	if (gateway) {
+	if (gateway && channelCtx) {
 		Object.assign(tools, createMessageTools());
 	}
 
@@ -206,6 +218,7 @@ export { createRssTools } from "./rss";
 export { createScheduleTools } from "./schedule";
 export { createSearchTools } from "./search";
 export { createSkillTools } from "./skills";
+export { createSubagentTools } from "./subagent";
 export { createTavilyTools } from "./tavily";
 export { createTtsTools } from "./tts";
 export { createWhisperTools } from "./whisper";

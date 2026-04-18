@@ -57,6 +57,62 @@ function cleanupSession(session: PtySession): void {
 	session.silenceTimer = null;
 }
 
+const KILL_GRACE_MS = 500;
+
+async function killSession(session: PtySession): Promise<void> {
+	// Cast to string: status can mutate via proc.exited.then while awaiting,
+	// so TS's narrowing after the first check is incorrect.
+	if ((session.status as string) === "exited") return;
+	const pid = session.proc.pid;
+	const isWindows = os.platform() === "win32";
+
+	if (isWindows) {
+		try {
+			session.proc.kill("SIGKILL");
+		} catch {
+			// already dead
+		}
+		return;
+	}
+
+	// Unix: signal the whole process group (negative PID).
+	try {
+		process.kill(-pid, "SIGTERM");
+	} catch {
+		// ESRCH — process already gone
+		return;
+	}
+
+	await new Promise<void>((resolve) => setTimeout(resolve, KILL_GRACE_MS));
+
+	if ((session.status as string) === "exited") return;
+	try {
+		process.kill(-pid, "SIGKILL");
+	} catch {
+		// ESRCH — exited during grace window
+	}
+}
+
+function bindAbortSignal(session: PtySession, signal: AbortSignal): () => void {
+	const handler = () => {
+		logger.debug(`[tool:bash] session ${session.id} aborted by signal, killing`);
+		void killSession(session).finally(() => {
+			cleanupSession(session);
+			sessions.delete(session.id);
+			session.waitResolve?.();
+		});
+	};
+
+	if (signal.aborted) {
+		// Fire async to avoid running handler before caller awaits createWaitPromise.
+		queueMicrotask(handler);
+		return () => {};
+	}
+
+	signal.addEventListener("abort", handler, { once: true });
+	return () => signal.removeEventListener("abort", handler);
+}
+
 function resetSilenceTimer(session: PtySession): void {
 	if (session.silenceTimer) clearTimeout(session.silenceTimer);
 	if (session.status === "exited") return;
@@ -217,7 +273,11 @@ When status is "waiting_for_input", the command produced no output within the si
 			timeout: z.number().optional().describe("Total timeout in milliseconds, default 600000"),
 			description: z.string().optional().describe("Brief description of what this command does"),
 		}),
-		execute: async ({ command, timeout, description }) => {
+		execute: async ({ command, timeout, description }, options?: { abortSignal?: AbortSignal }) => {
+			if (options?.abortSignal?.aborted) {
+				throw options.abortSignal.reason ?? new Error("bash aborted before execution");
+			}
+
 			const timeoutMs = Math.min(timeout ?? defaultTimeoutMs, MAX_TIMEOUT);
 			const desc = description ? ` (${description})` : "";
 			logger.debug(`[tool:bash] executing${desc}: ${command}`);
@@ -228,40 +288,50 @@ When status is "waiting_for_input", the command produced no output within the si
 				: silenceTimeoutMs;
 
 			const session = startSession(command, cwd, timeoutMs, effectiveSilenceMs);
+			const detach = options?.abortSignal
+				? bindAbortSignal(session, options.abortSignal)
+				: () => {};
 
-			// Wait for process exit or silence timeout
-			await createWaitPromise(session);
+			try {
+				await createWaitPromise(session);
 
-			const output = getSessionOutput(session, maxOutputLength);
+				if (options?.abortSignal?.aborted) {
+					throw options.abortSignal.reason ?? new Error("bash aborted");
+				}
 
-			logger.debug(
-				`[tool:bash] bash returning: sessionId=${session.id}, status=${session.status}, exitCode=${session.exitCode}, outputLen=${output.length}`,
-			);
+				const output = getSessionOutput(session, maxOutputLength);
 
-			if (session.status === "exited") {
-				sessions.delete(session.id);
+				logger.debug(
+					`[tool:bash] bash returning: sessionId=${session.id}, status=${session.status}, exitCode=${session.exitCode}, outputLen=${output.length}`,
+				);
+
+				if (session.status === "exited") {
+					sessions.delete(session.id);
+				}
+
+				const result: {
+					sessionId: string;
+					output: string;
+					status: "exited" | "waiting_for_input";
+					exitCode?: number;
+					hint?: string;
+				} = {
+					sessionId: session.id,
+					output,
+					status: session.status as "exited" | "waiting_for_input",
+					...(session.exitCode !== undefined && { exitCode: session.exitCode }),
+				};
+
+				if (session.status === "waiting_for_input" && output.length === 0) {
+					result.hint = command.includes("agent-browser")
+						? "No output produced. The browser may be blocked by a system dialog (e.g. Restore Pages prompt, keychain password, profile selection). Ask the user to dismiss the dialog manually (via remote desktop if needed), or call bash_kill and retry. Do not retry the same command."
+						: "No output produced. If this is a known long-running operation (API call, image generation, model inference, download, build), call bash_wait to continue waiting — do NOT kill. Only use bash_write or bash_kill if you confirm an interactive prompt or a truly stuck process.";
+				}
+
+				return result;
+			} finally {
+				detach();
 			}
-
-			const result: {
-				sessionId: string;
-				output: string;
-				status: "exited" | "waiting_for_input";
-				exitCode?: number;
-				hint?: string;
-			} = {
-				sessionId: session.id,
-				output,
-				status: session.status as "exited" | "waiting_for_input",
-				...(session.exitCode !== undefined && { exitCode: session.exitCode }),
-			};
-
-			if (session.status === "waiting_for_input" && output.length === 0) {
-				result.hint = command.includes("agent-browser")
-					? "No output produced. The browser may be blocked by a system dialog (e.g. Restore Pages prompt, keychain password, profile selection). Ask the user to dismiss the dialog manually (via remote desktop if needed), or call bash_kill and retry. Do not retry the same command."
-					: "No output produced. If this is a known long-running operation (API call, image generation, model inference, download, build), call bash_wait to continue waiting — do NOT kill. Only use bash_write or bash_kill if you confirm an interactive prompt or a truly stuck process.";
-			}
-
-			return result;
 		},
 	});
 
@@ -272,7 +342,7 @@ When status is "waiting_for_input", the command produced no output within the si
 			sessionId: z.string().describe("Session ID returned by bash"),
 			input: z.string().describe("Content to write (a newline is appended automatically)"),
 		}),
-		execute: async ({ sessionId, input }) => {
+		execute: async ({ sessionId, input }, options?: { abortSignal?: AbortSignal }) => {
 			const session = sessions.get(sessionId);
 			if (!session) {
 				return { error: "Session not found or already exited", status: "exited" as const };
@@ -283,6 +353,10 @@ When status is "waiting_for_input", the command produced no output within the si
 				return { output, status: "exited" as const, exitCode: session.exitCode };
 			}
 
+			if (options?.abortSignal?.aborted) {
+				throw options.abortSignal.reason ?? new Error("bash_write aborted before execution");
+			}
+
 			// Record output length before write to return only new output
 			const prevLength = session.output.length;
 
@@ -291,21 +365,32 @@ When status is "waiting_for_input", the command produced no output within the si
 			session.proc.terminal!.write(`${input}\n`);
 			logger.debug(`[tool:bash] session ${sessionId} write: "${input}"`);
 
-			// Wait for process exit or silence timeout
-			await createWaitPromise(session);
+			const detach = options?.abortSignal
+				? bindAbortSignal(session, options.abortSignal)
+				: () => {};
 
-			const newOutput = stripAnsi(session.output.slice(prevLength).join(""));
-			const truncated = truncateOutput(newOutput, maxOutputLength);
+			try {
+				await createWaitPromise(session);
 
-			logger.debug(
-				`[tool:bash] bash_write returning: sessionId=${sessionId}, status=${session.status}, newOutputLen=${truncated.length}`,
-			);
+				if (options?.abortSignal?.aborted) {
+					throw options.abortSignal.reason ?? new Error("bash_write aborted");
+				}
 
-			return {
-				output: truncated,
-				status: session.status as "exited" | "waiting_for_input",
-				...(session.exitCode !== undefined && { exitCode: session.exitCode }),
-			};
+				const newOutput = stripAnsi(session.output.slice(prevLength).join(""));
+				const truncated = truncateOutput(newOutput, maxOutputLength);
+
+				logger.debug(
+					`[tool:bash] bash_write returning: sessionId=${sessionId}, status=${session.status}, newOutputLen=${truncated.length}`,
+				);
+
+				return {
+					output: truncated,
+					status: session.status as "exited" | "waiting_for_input",
+					...(session.exitCode !== undefined && { exitCode: session.exitCode }),
+				};
+			} finally {
+				detach();
+			}
 		},
 	});
 
@@ -319,7 +404,7 @@ When status is "waiting_for_input", the command produced no output within the si
 				.optional()
 				.describe("Max wait time in milliseconds (default 60000, max 600000)"),
 		}),
-		execute: async ({ sessionId, timeout }) => {
+		execute: async ({ sessionId, timeout }, options?: { abortSignal?: AbortSignal }) => {
 			const session = sessions.get(sessionId);
 			if (!session) {
 				return { error: "Session not found or already exited", status: "exited" as const };
@@ -334,6 +419,10 @@ When status is "waiting_for_input", the command produced no output within the si
 				};
 			}
 
+			if (options?.abortSignal?.aborted) {
+				throw options.abortSignal.reason ?? new Error("bash_wait aborted before execution");
+			}
+
 			const prevLength = session.output.length;
 			const waitMs = Math.min(Math.max(timeout ?? 60_000, 1_000), MAX_TIMEOUT);
 
@@ -343,28 +432,39 @@ When status is "waiting_for_input", the command produced no output within the si
 			session.status = "running";
 			resetSilenceTimer(session);
 
-			await createWaitPromise(session);
+			const detach = options?.abortSignal
+				? bindAbortSignal(session, options.abortSignal)
+				: () => {};
 
-			// Restore default silence window for any future writes.
-			session.silenceTimeoutMs = previousSilence;
+			try {
+				await createWaitPromise(session);
 
-			const newOutput = stripAnsi(session.output.slice(prevLength).join(""));
-			const truncated = truncateOutput(newOutput, maxOutputLength);
+				if (options?.abortSignal?.aborted) {
+					throw options.abortSignal.reason ?? new Error("bash_wait aborted");
+				}
 
-			logger.debug(
-				`[tool:bash] bash_wait returning: sessionId=${sessionId}, status=${session.status}, newOutputLen=${truncated.length}`,
-			);
+				const newOutput = stripAnsi(session.output.slice(prevLength).join(""));
+				const truncated = truncateOutput(newOutput, maxOutputLength);
 
-			const finalStatus = session.status as PtySession["status"];
-			if (finalStatus === "exited") {
-				sessions.delete(sessionId);
+				logger.debug(
+					`[tool:bash] bash_wait returning: sessionId=${sessionId}, status=${session.status}, newOutputLen=${truncated.length}`,
+				);
+
+				const finalStatus = session.status as PtySession["status"];
+				if (finalStatus === "exited") {
+					sessions.delete(sessionId);
+				}
+
+				return {
+					output: truncated,
+					status: finalStatus as "exited" | "waiting_for_input",
+					...(session.exitCode !== undefined && { exitCode: session.exitCode }),
+				};
+			} finally {
+				// Restore default silence window for any future writes (also runs on abort throw).
+				session.silenceTimeoutMs = previousSilence;
+				detach();
 			}
-
-			return {
-				output: truncated,
-				status: finalStatus as "exited" | "waiting_for_input",
-				...(session.exitCode !== undefined && { exitCode: session.exitCode }),
-			};
 		},
 	});
 
