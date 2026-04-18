@@ -404,7 +404,7 @@ When status is "waiting_for_input", the command produced no output within the si
 				.optional()
 				.describe("Max wait time in milliseconds (default 60000, max 600000)"),
 		}),
-		execute: async ({ sessionId, timeout }) => {
+		execute: async ({ sessionId, timeout }, options?: { abortSignal?: AbortSignal }) => {
 			const session = sessions.get(sessionId);
 			if (!session) {
 				return { error: "Session not found or already exited", status: "exited" as const };
@@ -419,6 +419,10 @@ When status is "waiting_for_input", the command produced no output within the si
 				};
 			}
 
+			if (options?.abortSignal?.aborted) {
+				throw options.abortSignal.reason ?? new Error("bash_wait aborted before execution");
+			}
+
 			const prevLength = session.output.length;
 			const waitMs = Math.min(Math.max(timeout ?? 60_000, 1_000), MAX_TIMEOUT);
 
@@ -428,28 +432,39 @@ When status is "waiting_for_input", the command produced no output within the si
 			session.status = "running";
 			resetSilenceTimer(session);
 
-			await createWaitPromise(session);
+			const detach = options?.abortSignal
+				? bindAbortSignal(session, options.abortSignal)
+				: () => {};
 
-			// Restore default silence window for any future writes.
-			session.silenceTimeoutMs = previousSilence;
+			try {
+				await createWaitPromise(session);
 
-			const newOutput = stripAnsi(session.output.slice(prevLength).join(""));
-			const truncated = truncateOutput(newOutput, maxOutputLength);
+				if (options?.abortSignal?.aborted) {
+					throw options.abortSignal.reason ?? new Error("bash_wait aborted");
+				}
 
-			logger.debug(
-				`[tool:bash] bash_wait returning: sessionId=${sessionId}, status=${session.status}, newOutputLen=${truncated.length}`,
-			);
+				const newOutput = stripAnsi(session.output.slice(prevLength).join(""));
+				const truncated = truncateOutput(newOutput, maxOutputLength);
 
-			const finalStatus = session.status as PtySession["status"];
-			if (finalStatus === "exited") {
-				sessions.delete(sessionId);
+				logger.debug(
+					`[tool:bash] bash_wait returning: sessionId=${sessionId}, status=${session.status}, newOutputLen=${truncated.length}`,
+				);
+
+				const finalStatus = session.status as PtySession["status"];
+				if (finalStatus === "exited") {
+					sessions.delete(sessionId);
+				}
+
+				return {
+					output: truncated,
+					status: finalStatus as "exited" | "waiting_for_input",
+					...(session.exitCode !== undefined && { exitCode: session.exitCode }),
+				};
+			} finally {
+				// Restore default silence window for any future writes (also runs on abort throw).
+				session.silenceTimeoutMs = previousSilence;
+				detach();
 			}
-
-			return {
-				output: truncated,
-				status: finalStatus as "exited" | "waiting_for_input",
-				...(session.exitCode !== undefined && { exitCode: session.exitCode }),
-			};
 		},
 	});
 
