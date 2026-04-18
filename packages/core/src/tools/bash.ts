@@ -273,7 +273,11 @@ When status is "waiting_for_input", the command produced no output within the si
 			timeout: z.number().optional().describe("Total timeout in milliseconds, default 600000"),
 			description: z.string().optional().describe("Brief description of what this command does"),
 		}),
-		execute: async ({ command, timeout, description }) => {
+		execute: async ({ command, timeout, description }, options?: { abortSignal?: AbortSignal }) => {
+			if (options?.abortSignal?.aborted) {
+				throw options.abortSignal.reason ?? new Error("bash aborted before execution");
+			}
+
 			const timeoutMs = Math.min(timeout ?? defaultTimeoutMs, MAX_TIMEOUT);
 			const desc = description ? ` (${description})` : "";
 			logger.debug(`[tool:bash] executing${desc}: ${command}`);
@@ -284,40 +288,50 @@ When status is "waiting_for_input", the command produced no output within the si
 				: silenceTimeoutMs;
 
 			const session = startSession(command, cwd, timeoutMs, effectiveSilenceMs);
+			const detach = options?.abortSignal
+				? bindAbortSignal(session, options.abortSignal)
+				: () => {};
 
-			// Wait for process exit or silence timeout
-			await createWaitPromise(session);
+			try {
+				await createWaitPromise(session);
 
-			const output = getSessionOutput(session, maxOutputLength);
+				if (options?.abortSignal?.aborted) {
+					throw options.abortSignal.reason ?? new Error("bash aborted");
+				}
 
-			logger.debug(
-				`[tool:bash] bash returning: sessionId=${session.id}, status=${session.status}, exitCode=${session.exitCode}, outputLen=${output.length}`,
-			);
+				const output = getSessionOutput(session, maxOutputLength);
 
-			if (session.status === "exited") {
-				sessions.delete(session.id);
+				logger.debug(
+					`[tool:bash] bash returning: sessionId=${session.id}, status=${session.status}, exitCode=${session.exitCode}, outputLen=${output.length}`,
+				);
+
+				if (session.status === "exited") {
+					sessions.delete(session.id);
+				}
+
+				const result: {
+					sessionId: string;
+					output: string;
+					status: "exited" | "waiting_for_input";
+					exitCode?: number;
+					hint?: string;
+				} = {
+					sessionId: session.id,
+					output,
+					status: session.status as "exited" | "waiting_for_input",
+					...(session.exitCode !== undefined && { exitCode: session.exitCode }),
+				};
+
+				if (session.status === "waiting_for_input" && output.length === 0) {
+					result.hint = command.includes("agent-browser")
+						? "No output produced. The browser may be blocked by a system dialog (e.g. Restore Pages prompt, keychain password, profile selection). Ask the user to dismiss the dialog manually (via remote desktop if needed), or call bash_kill and retry. Do not retry the same command."
+						: "No output produced. If this is a known long-running operation (API call, image generation, model inference, download, build), call bash_wait to continue waiting — do NOT kill. Only use bash_write or bash_kill if you confirm an interactive prompt or a truly stuck process.";
+				}
+
+				return result;
+			} finally {
+				detach();
 			}
-
-			const result: {
-				sessionId: string;
-				output: string;
-				status: "exited" | "waiting_for_input";
-				exitCode?: number;
-				hint?: string;
-			} = {
-				sessionId: session.id,
-				output,
-				status: session.status as "exited" | "waiting_for_input",
-				...(session.exitCode !== undefined && { exitCode: session.exitCode }),
-			};
-
-			if (session.status === "waiting_for_input" && output.length === 0) {
-				result.hint = command.includes("agent-browser")
-					? "No output produced. The browser may be blocked by a system dialog (e.g. Restore Pages prompt, keychain password, profile selection). Ask the user to dismiss the dialog manually (via remote desktop if needed), or call bash_kill and retry. Do not retry the same command."
-					: "No output produced. If this is a known long-running operation (API call, image generation, model inference, download, build), call bash_wait to continue waiting — do NOT kill. Only use bash_write or bash_kill if you confirm an interactive prompt or a truly stuck process.";
-			}
-
-			return result;
 		},
 	});
 
