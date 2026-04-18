@@ -57,6 +57,42 @@ function cleanupSession(session: PtySession): void {
 	session.silenceTimer = null;
 }
 
+const KILL_GRACE_MS = 500;
+
+async function killSession(session: PtySession): Promise<void> {
+	// Cast to string: status can mutate via proc.exited.then while awaiting,
+	// so TS's narrowing after the first check is incorrect.
+	if ((session.status as string) === "exited") return;
+	const pid = session.proc.pid;
+	const isWindows = os.platform() === "win32";
+
+	if (isWindows) {
+		try {
+			session.proc.kill("SIGKILL");
+		} catch {
+			// already dead
+		}
+		return;
+	}
+
+	// Unix: signal the whole process group (negative PID).
+	try {
+		process.kill(-pid, "SIGTERM");
+	} catch {
+		// ESRCH — process already gone
+		return;
+	}
+
+	await new Promise<void>((resolve) => setTimeout(resolve, KILL_GRACE_MS));
+
+	if ((session.status as string) === "exited") return;
+	try {
+		process.kill(-pid, "SIGKILL");
+	} catch {
+		// ESRCH — exited during grace window
+	}
+}
+
 function resetSilenceTimer(session: PtySession): void {
 	if (session.silenceTimer) clearTimeout(session.silenceTimer);
 	if (session.status === "exited") return;
