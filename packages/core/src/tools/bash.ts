@@ -342,7 +342,7 @@ When status is "waiting_for_input", the command produced no output within the si
 			sessionId: z.string().describe("Session ID returned by bash"),
 			input: z.string().describe("Content to write (a newline is appended automatically)"),
 		}),
-		execute: async ({ sessionId, input }) => {
+		execute: async ({ sessionId, input }, options?: { abortSignal?: AbortSignal }) => {
 			const session = sessions.get(sessionId);
 			if (!session) {
 				return { error: "Session not found or already exited", status: "exited" as const };
@@ -353,6 +353,10 @@ When status is "waiting_for_input", the command produced no output within the si
 				return { output, status: "exited" as const, exitCode: session.exitCode };
 			}
 
+			if (options?.abortSignal?.aborted) {
+				throw options.abortSignal.reason ?? new Error("bash_write aborted before execution");
+			}
+
 			// Record output length before write to return only new output
 			const prevLength = session.output.length;
 
@@ -361,21 +365,32 @@ When status is "waiting_for_input", the command produced no output within the si
 			session.proc.terminal!.write(`${input}\n`);
 			logger.debug(`[tool:bash] session ${sessionId} write: "${input}"`);
 
-			// Wait for process exit or silence timeout
-			await createWaitPromise(session);
+			const detach = options?.abortSignal
+				? bindAbortSignal(session, options.abortSignal)
+				: () => {};
 
-			const newOutput = stripAnsi(session.output.slice(prevLength).join(""));
-			const truncated = truncateOutput(newOutput, maxOutputLength);
+			try {
+				await createWaitPromise(session);
 
-			logger.debug(
-				`[tool:bash] bash_write returning: sessionId=${sessionId}, status=${session.status}, newOutputLen=${truncated.length}`,
-			);
+				if (options?.abortSignal?.aborted) {
+					throw options.abortSignal.reason ?? new Error("bash_write aborted");
+				}
 
-			return {
-				output: truncated,
-				status: session.status as "exited" | "waiting_for_input",
-				...(session.exitCode !== undefined && { exitCode: session.exitCode }),
-			};
+				const newOutput = stripAnsi(session.output.slice(prevLength).join(""));
+				const truncated = truncateOutput(newOutput, maxOutputLength);
+
+				logger.debug(
+					`[tool:bash] bash_write returning: sessionId=${sessionId}, status=${session.status}, newOutputLen=${truncated.length}`,
+				);
+
+				return {
+					output: truncated,
+					status: session.status as "exited" | "waiting_for_input",
+					...(session.exitCode !== undefined && { exitCode: session.exitCode }),
+				};
+			} finally {
+				detach();
+			}
 		},
 	});
 
