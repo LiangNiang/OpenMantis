@@ -93,6 +93,26 @@ async function killSession(session: PtySession): Promise<void> {
 	}
 }
 
+function bindAbortSignal(session: PtySession, signal: AbortSignal): () => void {
+	const handler = () => {
+		logger.debug(`[tool:bash] session ${session.id} aborted by signal, killing`);
+		void killSession(session).finally(() => {
+			cleanupSession(session);
+			sessions.delete(session.id);
+			session.waitResolve?.();
+		});
+	};
+
+	if (signal.aborted) {
+		// Fire async to avoid running handler before caller awaits createWaitPromise.
+		queueMicrotask(handler);
+		return () => {};
+	}
+
+	signal.addEventListener("abort", handler, { once: true });
+	return () => signal.removeEventListener("abort", handler);
+}
+
 function resetSilenceTimer(session: PtySession): void {
 	if (session.silenceTimer) clearTimeout(session.silenceTimer);
 	if (session.status === "exited") return;
