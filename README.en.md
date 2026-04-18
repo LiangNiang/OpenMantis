@@ -23,6 +23,7 @@ Connect multiple LLM providers to multiple communication channels with composabl
 - **Multi-LLM-Provider** — OpenAI, Anthropic, Bytedance/Doubao, Xiaomi MiMo, and any OpenAI-compatible endpoint. Switch LLM providers per channel or per message route.
 - **Multi-Channel** — Feishu/Lark, WeCom, QQ. Each channel gets streaming responses and attachment handling. Feishu additionally supports interactive card UI and multiple bot apps per channel.
 - **Composable Tools** — Bash, file I/O, web search (Tavily, Exa), RSS, TTS, memory, scheduling, and more. Enable or disable tool groups via config.
+- **Sub-Agent Dispatch** — Fan out independent tasks to context-isolated child agents via the `subagent` tool; multiple calls in the same response run in parallel. Depth cap 2, concurrency cap 8, 5-minute timeout, with proper abort-signal propagation.
 - **Skills System** — Built-in skills (weather, DOCX/XLSX generation, browser automation, image generation) plus user-defined custom skills.
 - **Task Scheduler** — Fixed interval, cron expression, or one-time scheduled tasks that execute through the full agent pipeline.
 - **Browser Automation** — Drive a real browser via [agent-browser](https://github.com/vercel-labs/agent-browser) with isolated per-session profiles or CDP mode for reusing your local Chrome.
@@ -172,7 +173,8 @@ Tools are organized into groups and can be toggled via the `excludeTools` config
 | `whisper` | `audio_transcribe` | Transcribe audio/video files to text with SRT subtitles and timestamps |
 | `tts` | `tts_speak` | Text-to-speech synthesis via Xiaomi TTS with style/expression support |
 | `memory` | `save_memory`, `recall_memory`, `load_route_context` | Long-term memory (core/archive), keyword/date/tag recall, and past session loading |
-| `message` | `send_message` | Send messages to specified channels (always injected when gateway context available) |
+| `message` | `send_message` | Send messages to specified channels (injected when gateway context is available and the caller holds a channel context; subagents never receive it) |
+| `subagent` | `subagent` | Dispatch a context-isolated child agent for an independent task; multiple calls in one response run concurrently (depth ≤ 2, concurrency ≤ 8, 5-minute timeout) |
 
 Channel-specific tools (Feishu file uploads, doc creation, etc.) are injected automatically based on the active channel.
 
@@ -256,7 +258,8 @@ Tasks execute through the full agent pipeline and results are delivered to the o
 ### Phase 1
 
 - [ ] **Deep Feishu Integration** — Expand native Feishu capabilities (approvals, calendar, email, docs, etc.)
-- [ ] **Multi-Agent Orchestration** — Support Multi-Agent and Sub-Agent collaboration for complex task decomposition and parallel execution
+- [x] **Sub-Agent Dispatch** — Fan out to context-isolated child agents via the `subagent` tool; multiple calls in one response run in parallel (depth ≤ 2, concurrency ≤ 8)
+- [ ] **Multi-Agent Orchestration** — Build on Sub-Agent dispatch toward richer Multi-Agent collaboration and task decomposition
 - [ ] **Memory System Redesign** — Rearchitect storage and retrieval for better accuracy and scalability
 - [ ] **Telegram Channel** — Add Telegram Bot adapter
 
