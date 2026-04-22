@@ -77,6 +77,7 @@ const browserConfigSchema = z.object({
 	enabled: z.boolean().default(false),
 	binPath: z.string().default("agent-browser"),
 	cdp: browserCdpConfigSchema.optional(),
+	maxOutputLength: z.number().int().positive().optional(),
 });
 
 export function isBrowserCdpActive(config: {
