@@ -148,12 +148,14 @@ async function spillToFile(
 function buildBrowserDescription(config: OpenMantisConfig): string {
 	const base =
 		"Run an `agent-browser` subcommand. Pass the subcommand and its args as `args[]` " +
-		'(e.g. `["open","https://example.com"]`, `["snapshot","-i"]`). Session and profile ' +
-		"flags are managed automatically — do NOT pass `--session`, `--profile`, `--cdp`, or " +
-		"`--auto-connect`. Default timeout 60s; for long waits/downloads pass `timeout` " +
-		"explicitly. Returns stdout/stderr in `output`; outputs over the threshold spill to " +
-		"`outputFile` (use `file_read` with offset/limit to inspect). Use `browser_help` " +
-		"first if you don't know the subcommand to use.";
+		'(e.g. `["open","https://example.com"]`, `["snapshot","-i"]`). For subcommands that ' +
+		'read from stdin (e.g. `["eval","--stdin"]`, `["auth","save","--password-stdin"]`), ' +
+		"pass the input text as `stdin`. Session and profile flags are managed automatically " +
+		"— do NOT pass `--session`, `--profile`, `--cdp`, or `--auto-connect`. Default " +
+		"timeout 60s; for long waits/downloads pass `timeout` explicitly. Returns stdout/stderr " +
+		"in `output`; outputs over the threshold spill to `outputFile` (use `file_read` with " +
+		"offset/limit to inspect). Use `browser_help` first if you don't know the subcommand " +
+		"to use.";
 	if (!isBrowserCdpActive(config)) return base;
 	const warning =
 		"\n\nCDP MODE: This browser shares cookies and login state with the user's real " +
@@ -167,7 +169,7 @@ function buildBrowserDescription(config: OpenMantisConfig): string {
 export const BROWSER_TOOL_GUIDE = `## Browser Tools Usage Guide
 
 - **browser_help**: Read this FIRST. Loads version-matched usage docs from the installed CLI. Default topic "core" covers the snapshot-and-ref loop, navigation, interaction, waiting, and common workflows.
-- **browser**: Run an agent-browser subcommand. Pass args as a string array. Session/profile/CDP flags are auto-managed — passing them yourself is rejected. For long waits or downloads, pass an explicit timeout. Outputs over ~100K chars spill to outputFile; use file_read to inspect specific ranges.
+- **browser**: Run an agent-browser subcommand. Pass args as a string array. For subcommands that read stdin (e.g. eval --stdin), pass the input via stdin. Session/profile/CDP flags are auto-managed — passing them yourself is rejected. For long waits or downloads, pass an explicit timeout. Outputs over ~100K chars spill to outputFile; use file_read to inspect specific ranges.
 - **browser_kill**: Last-resort termination. Prefer a longer timeout over killing.`;
 
 export interface BrowserToolContext {
@@ -198,13 +200,25 @@ export function createBrowserTools(
 				.describe(
 					"Override output threshold in characters. Outputs beyond this size spill to a file.",
 				),
+			stdin: z
+				.string()
+				.optional()
+				.describe(
+					'Optional stdin content for subcommands that read from stdin (e.g. `eval --stdin`, `auth save --password-stdin`). Passing this does NOT imply --stdin is added to args — you must still include the relevant flag (e.g. `args: ["eval", "--stdin"]`).',
+				),
 			description: z.string().optional().describe("Brief description for logging"),
 		}),
-		execute: async ({ args, timeout, maxOutputLength, description }) => {
+		execute: async ({ args, timeout, maxOutputLength, stdin, description }) => {
 			const managed = detectManagedFlag(args);
 			if (managed) {
 				return {
 					error: `flag '${managed}' is managed by the tool and must not be passed in args`,
+				};
+			}
+
+			if (stdin !== undefined && stdin.length > 1_000_000) {
+				return {
+					error: `stdin too large: ${stdin.length} chars (limit: 1,000,000)`,
 				};
 			}
 
@@ -224,9 +238,11 @@ export function createBrowserTools(
 			const desc = description ? ` (${description})` : "";
 			logger.debug(`[tool:browser] ${sessionId}${desc}: ${argv.join(" ")}`);
 
+			const stdinOption = stdin && stdin.length > 0 ? { stdin: new Blob([stdin]) } : {};
+
 			let proc: ReturnType<typeof Bun.spawn>;
 			try {
-				proc = Bun.spawn(argv, { stdout: "pipe", stderr: "pipe" });
+				proc = Bun.spawn(argv, { stdout: "pipe", stderr: "pipe", ...stdinOption });
 			} catch (err) {
 				return {
 					sessionId,
@@ -262,7 +278,11 @@ export function createBrowserTools(
 					logger.debug(`[tool:browser] ${sessionId} retry (isolation): ${fallbackArgv.join(" ")}`);
 
 					try {
-						const proc2 = Bun.spawn(fallbackArgv, { stdout: "pipe", stderr: "pipe" });
+						const proc2 = Bun.spawn(fallbackArgv, {
+							stdout: "pipe",
+							stderr: "pipe",
+							...stdinOption,
+						});
 						session.proc = proc2;
 						result = await runProcAttempt(session, timeoutMs);
 						didFallback = true;
