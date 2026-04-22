@@ -222,12 +222,7 @@ When status is "waiting_for_input", the command produced no output within the si
 			const desc = description ? ` (${description})` : "";
 			logger.debug(`[tool:bash] executing${desc}: ${command}`);
 
-			// Use a longer silence window for browser commands to avoid false waiting_for_input.
-			const effectiveSilenceMs = command.includes("agent-browser")
-				? Math.max(silenceTimeoutMs, 15_000)
-				: silenceTimeoutMs;
-
-			const session = startSession(command, cwd, timeoutMs, effectiveSilenceMs);
+			const session = startSession(command, cwd, timeoutMs, silenceTimeoutMs);
 
 			// Wait for process exit or silence timeout
 			await createWaitPromise(session);
@@ -256,9 +251,8 @@ When status is "waiting_for_input", the command produced no output within the si
 			};
 
 			if (session.status === "waiting_for_input" && output.length === 0) {
-				result.hint = command.includes("agent-browser")
-					? "No output produced. The browser may be blocked by a system dialog (e.g. Restore Pages prompt, keychain password, profile selection). Ask the user to dismiss the dialog manually (via remote desktop if needed), or call bash_kill and retry. Do not retry the same command."
-					: "No output produced. If this is a known long-running operation (API call, image generation, model inference, download, build), call bash_wait to continue waiting — do NOT kill. Only use bash_write or bash_kill if you confirm an interactive prompt or a truly stuck process.";
+				result.hint =
+					"No output produced. If this is a known long-running operation (API call, image generation, model inference, download, build), call bash_wait to continue waiting — do NOT kill. Only use bash_write or bash_kill if you confirm an interactive prompt or a truly stuck process.";
 			}
 
 			return result;
