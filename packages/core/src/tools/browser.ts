@@ -9,6 +9,11 @@ import { z } from "zod";
 const logger = createLogger("core/tools/browser");
 
 const MAX_TIMEOUT = 600_000;
+const CDP_FALLBACK_TTL = 60_000;
+const CDP_FAILURE_PATTERN =
+	/No running Chrome|remote-debugging-port|Failed to connect|Could not connect/i;
+
+let cdpFallback: { at: number } | null = null;
 const DEFAULT_TIMEOUT = 60_000;
 const DEFAULT_MAX_OUTPUT = 100_000;
 const MAX_OUTPUT_LIMIT = 1_000_000;
@@ -48,15 +53,49 @@ function detectManagedFlag(args: string[]): string | null {
 	return null;
 }
 
-function buildAutoFlags(config: OpenMantisConfig, routeId: string): string[] {
+function buildAutoFlags(
+	config: OpenMantisConfig,
+	routeId: string,
+	forceIsolation = false,
+): string[] {
 	const cdp = config.browser?.cdp;
-	if (cdp?.autoConnect === true) {
+	if (!forceIsolation && cdp?.autoConnect === true) {
 		return ["--auto-connect", "--session", `route-${routeId}`];
 	}
-	if (typeof cdp?.port === "number") {
+	if (!forceIsolation && typeof cdp?.port === "number") {
 		return ["--cdp", String(cdp.port), "--session", `route-${routeId}`];
 	}
 	return ["--session", `route-${routeId}`, "--profile", browserProfileDir(routeId)];
+}
+
+function detectCdpFailure(raw: string, exitCode: number): boolean {
+	if (exitCode === 0) return false;
+	return CDP_FAILURE_PATTERN.test(raw);
+}
+
+async function runProcAttempt(
+	session: BrowserSession,
+	timeoutMs: number,
+): Promise<{ raw: string; exitCode: number; timedOut: boolean }> {
+	const proc = session.proc;
+	let timedOut = false;
+	const timer = setTimeout(() => {
+		if (!proc.killed) {
+			timedOut = true;
+			proc.kill("SIGKILL");
+		}
+	}, timeoutMs);
+	try {
+		const [stdoutText, stderrText, exitCode] = await Promise.all([
+			new Response(proc.stdout as ReadableStream).text(),
+			new Response(proc.stderr as ReadableStream).text(),
+			proc.exited,
+		]);
+		const raw = stripAnsi(`${stdoutText}${stderrText}`);
+		return { raw, exitCode, timedOut };
+	} finally {
+		clearTimeout(timer);
+	}
 }
 
 async function pruneOutputDir(dir: string, keep: number): Promise<void> {
@@ -175,7 +214,11 @@ export function createBrowserTools(
 				maxOutputLength ?? configDefaultMax ?? DEFAULT_MAX_OUTPUT,
 				MAX_OUTPUT_LIMIT,
 			);
-			const autoFlags = buildAutoFlags(config, ctx.routeId);
+
+			const cdpConfigured = isBrowserCdpActive(config);
+			const inFallbackWindow =
+				cdpFallback !== null && Date.now() - cdpFallback.at < CDP_FALLBACK_TTL;
+			const autoFlags = buildAutoFlags(config, ctx.routeId, inFallbackWindow);
 			const argv = [binPath, ...autoFlags, ...args];
 
 			const desc = description ? ` (${description})` : "";
@@ -197,24 +240,42 @@ export function createBrowserTools(
 			const session: BrowserSession = { proc };
 			sessions.set(sessionId, session);
 
-			let timedOut = false;
-			const timeoutTimer = setTimeout(() => {
-				if (!session.proc.killed) {
-					timedOut = true;
-					logger.debug(`[tool:browser] ${sessionId} timeout at ${timeoutMs}ms, killing`);
-					session.proc.kill("SIGKILL");
-				}
-			}, timeoutMs);
-
 			try {
-				const [stdoutText, stderrText, exitCode] = await Promise.all([
-					new Response(proc.stdout as ReadableStream).text(),
-					new Response(proc.stderr as ReadableStream).text(),
-					proc.exited,
-				]);
+				let result = await runProcAttempt(session, timeoutMs);
+				let didFallback = false;
 
-				const raw = stripAnsi(`${stdoutText}${stderrText}`);
-				const status: "exited" | "timeout" = timedOut ? "timeout" : "exited";
+				const naturalExit = !session.proc.killed;
+				const shouldFallback =
+					cdpConfigured &&
+					!inFallbackWindow &&
+					naturalExit &&
+					detectCdpFailure(result.raw, result.exitCode);
+
+				if (shouldFallback) {
+					cdpFallback = { at: Date.now() };
+					logger.warn(
+						`[browser] CDP unreachable (exitCode=${result.exitCode}); falling back to isolation mode for ${CDP_FALLBACK_TTL / 1000}s`,
+					);
+
+					const fallbackFlags = buildAutoFlags(config, ctx.routeId, true);
+					const fallbackArgv = [binPath, ...fallbackFlags, ...args];
+					logger.debug(`[tool:browser] ${sessionId} retry (isolation): ${fallbackArgv.join(" ")}`);
+
+					try {
+						const proc2 = Bun.spawn(fallbackArgv, { stdout: "pipe", stderr: "pipe" });
+						session.proc = proc2;
+						result = await runProcAttempt(session, timeoutMs);
+						didFallback = true;
+					} catch (err) {
+						logger.warn(
+							`[browser] fallback spawn failed: ${err instanceof Error ? err.message : String(err)}`,
+						);
+						// Keep original failure result if fallback spawn itself errors
+					}
+				}
+
+				const raw = result.raw;
+				const status: "exited" | "timeout" = result.timedOut ? "timeout" : "exited";
 
 				let resultOutput = raw;
 				let spillMeta: { outputFile: string; outputBytes: number } | null = null;
@@ -224,14 +285,15 @@ export function createBrowserTools(
 				}
 
 				logger.debug(
-					`[tool:browser] ${sessionId} status=${status} exitCode=${exitCode} rawLen=${raw.length} spilled=${spillMeta !== null}`,
+					`[tool:browser] ${sessionId} status=${status} exitCode=${result.exitCode} rawLen=${raw.length} spilled=${spillMeta !== null} cdpFallback=${didFallback}`,
 				);
 
-				const result: {
+				const finalResult: {
 					sessionId: string;
 					output: string;
 					status: "exited" | "timeout";
 					exitCode: number;
+					cdpFallback?: true;
 					outputFile?: string;
 					outputBytes?: number;
 					outputTruncated?: true;
@@ -239,16 +301,18 @@ export function createBrowserTools(
 					sessionId,
 					output: resultOutput,
 					status,
-					exitCode,
+					exitCode: result.exitCode,
 				};
-				if (spillMeta) {
-					result.outputFile = spillMeta.outputFile;
-					result.outputBytes = spillMeta.outputBytes;
-					result.outputTruncated = true;
+				if (didFallback) {
+					finalResult.cdpFallback = true;
 				}
-				return result;
+				if (spillMeta) {
+					finalResult.outputFile = spillMeta.outputFile;
+					finalResult.outputBytes = spillMeta.outputBytes;
+					finalResult.outputTruncated = true;
+				}
+				return finalResult;
 			} finally {
-				clearTimeout(timeoutTimer);
 				if (!session.proc.killed) {
 					session.proc.kill("SIGKILL");
 				}
