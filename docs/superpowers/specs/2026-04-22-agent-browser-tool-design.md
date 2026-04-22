@@ -118,15 +118,17 @@ CDP 启用时，追加 ~8 行 CDP 安全守则（替代 `browser-prompt.ts` 第 
 **行为**：
 - 在 sessions Map 查找；
 - 找到且未退出 → `proc.kill("SIGKILL")` → 等 `proc.exited` → 删表项；
-- 找到但已退出 / 找不到 → 返回 `{ error, status: "exited" }`。
+- 找到但已退出 / 找不到 → 返回 `{ error, status: "exited", exitCode: -1 }`。
 
 **返回**：
 ```ts
-{ output: string; status: "exited"; exitCode: number; }
+{ killed: true; status: "exited"; exitCode: number; }
 ```
 
+注：由于 `browser` 同步执行模型下已捕获的 stdout/stderr 由原调用的 `Promise.all` 持有，`browser_kill` 本身没有句柄去归还该输出 —— SIGKILL 之后原 `browser` 调用的流会 close，其 `output` 字段正常带回已捕获内容。因此 `browser_kill` 返回的是「确认 + 真实 exitCode」形状，不复制 output。
+
 **Description**：
-> Terminate a running `browser` session. Use ONLY when a command is truly stuck (e.g. blocked by a system dialog the user can't dismiss) or the user explicitly asks to stop it. Returns any output captured before termination. Slow commands that are working normally — wait them out via a longer `timeout` on the next call instead of killing.
+> Terminate a running `browser` session. Use ONLY when a command is truly stuck (e.g. blocked by a system dialog the user can't dismiss) or the user explicitly asks to stop it. Returns confirmation only — captured output goes back through the original `browser` call's response (which will resolve once the kill propagates). Slow commands that are working normally — wait them out via a longer `timeout` on the next call instead of killing.
 
 注：`browser` 工具是同步执行模型，模型在自己调用阻塞期间无法插入 `browser_kill`；该工具的真正用途是**并发会话**场景（用户在另一条消息里要求停止）。与 `bash_kill` 形态对称，实现成本低，保留。
 

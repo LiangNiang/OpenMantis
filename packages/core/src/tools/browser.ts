@@ -21,7 +21,6 @@ const ANSI_REGEX = /\x1b\[[0-9;]*[a-zA-Z]|\x1b\].*?\x07|\x1b\[[?]?[0-9;]*[a-zA-Z
 
 interface BrowserSession {
 	proc: ReturnType<typeof Bun.spawn>;
-	startedAt: number;
 }
 
 const sessions = new Map<string, BrowserSession>();
@@ -195,7 +194,7 @@ export function createBrowserTools(
 				};
 			}
 
-			const session: BrowserSession = { proc, startedAt: Date.now() };
+			const session: BrowserSession = { proc };
 			sessions.set(sessionId, session);
 
 			let timedOut = false;
