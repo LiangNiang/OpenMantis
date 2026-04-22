@@ -28,6 +28,19 @@ const MAX_TIMEOUT = 600_000;
 // biome-ignore lint/suspicious/noControlCharactersInRegex: intentional ANSI escape matching
 const ANSI_REGEX = /\x1b\[[0-9;]*[a-zA-Z]|\x1b\].*?\x07|\x1b\[[?]?[0-9;]*[a-zA-Z]/g;
 
+// Match a command segment that invokes `agent-browser` (or `npx agent-browser`,
+// or an absolute path to agent-browser). Triggers at a command-start position
+// (beginning of string or after a shell separator `; && || |`). Allows leading
+// env-var assignments (FOO=bar). Does NOT match incidental mentions like
+// `which agent-browser`, `grep agent-browser`, or paths that merely contain
+// the word.
+const AGENT_BROWSER_INVOCATION_RE =
+	/(?:^|[;&|]\s*)(?:[A-Z_][A-Z0-9_]*=\S*\s+)*(?:npx\s+)?(?:\S*\/)?agent-browser(?:\s|$)/;
+
+function detectAgentBrowserInvocation(command: string): boolean {
+	return AGENT_BROWSER_INVOCATION_RE.test(command);
+}
+
 function stripAnsi(text: string): string {
 	return text.replace(ANSI_REGEX, "");
 }
@@ -218,6 +231,14 @@ When status is "waiting_for_input", the command produced no output within the si
 			description: z.string().optional().describe("Brief description of what this command does"),
 		}),
 		execute: async ({ command, timeout, description }) => {
+			if (detectAgentBrowserInvocation(command)) {
+				return {
+					error:
+						"agent-browser must be invoked through the `browser` tool to preserve session isolation. " +
+						'Use `{"args": ["<subcommand>", "<arg>", ...]}` (e.g. `{"args": ["open", "https://example.com"]}`). ' +
+						"For stdin subcommands use the `stdin` field. Session/profile/CDP flags are auto-managed.",
+				};
+			}
 			const timeoutMs = Math.min(timeout ?? defaultTimeoutMs, MAX_TIMEOUT);
 			const desc = description ? ` (${description})` : "";
 			logger.debug(`[tool:bash] executing${desc}: ${command}`);

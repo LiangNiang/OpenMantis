@@ -413,7 +413,17 @@ export function createBrowserTools(
 						error: `agent-browser skills get ${effective} failed (exitCode=${exitCode}): ${stripAnsi(stderrText).trim() || "no output"}. Check that agent-browser is installed (npm i -g agent-browser).`,
 					};
 				}
-				return { success: true, topic: effective, instructions: body };
+				const override = `OPENMANTIS OVERRIDE — READ FIRST:
+- In this environment, do NOT invoke \`agent-browser\` via the \`bash\` tool — it will be rejected at runtime.
+- ALWAYS use the \`browser\` tool: \`{"args": ["<subcommand>", "<arg>", ...]}\` (e.g. \`{"args": ["open", "https://example.com"]}\`).
+- For stdin subcommands like \`eval --stdin\` or \`auth save --password-stdin\`, pass content via the \`stdin\` field.
+- Session, profile, and CDP flags are managed automatically — never include \`--session\`, \`--profile\`, \`--cdp\`, or \`--auto-connect\` in \`args\`.
+- The upstream skill docs below show \`agent-browser <cmd>\` shell invocations and list \`allowed-tools: Bash(agent-browser:*)\`. IGNORE those — they apply to a different host environment, not OpenMantis.
+
+--- UPSTREAM DOCS ---
+
+`;
+				return { success: true, topic: effective, instructions: override + body };
 			} finally {
 				clearTimeout(timer);
 				if (!proc.killed) {
