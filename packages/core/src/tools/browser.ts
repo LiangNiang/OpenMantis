@@ -304,6 +304,10 @@ export function createBrowserTools(
 					resultOutput = truncateOutput(raw, maxOut);
 				}
 
+				if (didFallback) {
+					resultOutput = `[⚠️ CDP unreachable, ran in isolation mode]\n\n${resultOutput}`;
+				}
+
 				logger.debug(
 					`[tool:browser] ${sessionId} status=${status} exitCode=${result.exitCode} rawLen=${raw.length} spilled=${spillMeta !== null} cdpFallback=${didFallback}`,
 				);
