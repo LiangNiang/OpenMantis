@@ -11,7 +11,6 @@ import { memoryStore } from "../tools/memory";
 
 const logger = createLogger("core/agent");
 
-import { buildBrowserPromptSection } from "./browser-prompt";
 import { buildStructuredPrompt } from "./prompts";
 import { createLanguageModel } from "./providers";
 import { resolveThinkingOptions } from "./thinking";
@@ -83,11 +82,6 @@ export class AgentFactory {
 		let instructions = buildStructuredPrompt(this.config, toolGuides);
 		if (skillInstructions.trim()) {
 			instructions += `\n\n## 可用技能\n\n${skillInstructions.trim()}`;
-		}
-
-		const browserSection = buildBrowserPromptSection(this.config, options?.routeId);
-		if (browserSection) {
-			instructions += `\n\n${browserSection}`;
 		}
 
 		// Inject core memory into system prompt
