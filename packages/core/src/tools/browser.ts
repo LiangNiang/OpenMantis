@@ -1,6 +1,6 @@
 import { mkdir, readdir, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { OpenMantisConfig } from "@openmantis/common/config/schema";
+import { isBrowserCdpActive, type OpenMantisConfig } from "@openmantis/common/config/schema";
 import { createLogger } from "@openmantis/common/logger";
 import { browserProfileDir, WORKSPACE_DIR } from "@openmantis/common/paths";
 import { type Tool, tool } from "ai";
@@ -41,7 +41,10 @@ function truncateOutput(output: string, maxLength: number): string {
 
 function detectManagedFlag(args: string[]): string | null {
 	for (const a of args) {
-		if (MANAGED_FLAGS.has(a)) return a;
+		for (const flag of MANAGED_FLAGS) {
+			if (a === flag) return flag;
+			if (a.startsWith(`${flag}=`)) return flag;
+		}
 	}
 	return null;
 }
@@ -113,9 +116,7 @@ function buildBrowserDescription(config: OpenMantisConfig): string {
 		"explicitly. Returns stdout/stderr in `output`; outputs over the threshold spill to " +
 		"`outputFile` (use `file_read` with offset/limit to inspect). Use `browser_help` " +
 		"first if you don't know the subcommand to use.";
-	const cdp = config.browser?.cdp;
-	const cdpActive = cdp?.autoConnect === true || typeof cdp?.port === "number";
-	if (!cdpActive) return base;
+	if (!isBrowserCdpActive(config)) return base;
 	const warning =
 		"\n\nCDP MODE: This browser shares cookies and login state with the user's real " +
 		"Chrome. NEVER perform destructive or irreversible actions without explicit user " +
@@ -206,55 +207,60 @@ export function createBrowserTools(
 				}
 			}, timeoutMs);
 
-			const [stdoutText, stderrText, exitCode] = await Promise.all([
-				new Response(proc.stdout as ReadableStream).text(),
-				new Response(proc.stderr as ReadableStream).text(),
-				proc.exited,
-			]);
-			clearTimeout(timeoutTimer);
+			try {
+				const [stdoutText, stderrText, exitCode] = await Promise.all([
+					new Response(proc.stdout as ReadableStream).text(),
+					new Response(proc.stderr as ReadableStream).text(),
+					proc.exited,
+				]);
 
-			const raw = stripAnsi(`${stdoutText}${stderrText}`);
-			const status: "exited" | "timeout" = timedOut ? "timeout" : "exited";
+				const raw = stripAnsi(`${stdoutText}${stderrText}`);
+				const status: "exited" | "timeout" = timedOut ? "timeout" : "exited";
 
-			let resultOutput = raw;
-			let spillMeta: { outputFile: string; outputBytes: number } | null = null;
-			if (raw.length > maxOut) {
-				spillMeta = await spillToFile(sessionId, raw);
-				resultOutput = truncateOutput(raw, maxOut);
+				let resultOutput = raw;
+				let spillMeta: { outputFile: string; outputBytes: number } | null = null;
+				if (raw.length > maxOut) {
+					spillMeta = await spillToFile(sessionId, raw);
+					resultOutput = truncateOutput(raw, maxOut);
+				}
+
+				logger.debug(
+					`[tool:browser] ${sessionId} status=${status} exitCode=${exitCode} rawLen=${raw.length} spilled=${spillMeta !== null}`,
+				);
+
+				const result: {
+					sessionId: string;
+					output: string;
+					status: "exited" | "timeout";
+					exitCode: number;
+					outputFile?: string;
+					outputBytes?: number;
+					outputTruncated?: true;
+				} = {
+					sessionId,
+					output: resultOutput,
+					status,
+					exitCode,
+				};
+				if (spillMeta) {
+					result.outputFile = spillMeta.outputFile;
+					result.outputBytes = spillMeta.outputBytes;
+					result.outputTruncated = true;
+				}
+				return result;
+			} finally {
+				clearTimeout(timeoutTimer);
+				if (!session.proc.killed) {
+					session.proc.kill("SIGKILL");
+				}
+				sessions.delete(sessionId);
 			}
-
-			sessions.delete(sessionId);
-
-			logger.debug(
-				`[tool:browser] ${sessionId} status=${status} exitCode=${exitCode} rawLen=${raw.length} spilled=${spillMeta !== null}`,
-			);
-
-			const result: {
-				sessionId: string;
-				output: string;
-				status: "exited" | "timeout";
-				exitCode: number;
-				outputFile?: string;
-				outputBytes?: number;
-				outputTruncated?: true;
-			} = {
-				sessionId,
-				output: resultOutput,
-				status,
-				exitCode,
-			};
-			if (spillMeta) {
-				result.outputFile = spillMeta.outputFile;
-				result.outputBytes = spillMeta.outputBytes;
-				result.outputTruncated = true;
-			}
-			return result;
 		},
 	});
 
 	const browser_kill = tool({
 		description:
-			"Terminate a running `browser` session. Use ONLY when a command is truly stuck (e.g. blocked by a system dialog the user can't dismiss) or the user explicitly asks to stop it. Returns any output captured before termination. Slow commands that are working normally — wait them out via a longer `timeout` on the next call instead of killing.",
+			"Terminate a running `browser` session. Use ONLY when a command is truly stuck (e.g. blocked by a system dialog the user can't dismiss) or the user explicitly asks to stop it. Returns confirmation only — captured output goes back through the original `browser` call's response (which will resolve once the kill propagates). Slow commands that are working normally — wait them out via a longer `timeout` on the next call instead of killing.",
 		inputSchema: z.object({
 			sessionId: z.string().describe("Session ID returned by browser"),
 		}),
@@ -269,13 +275,13 @@ export function createBrowserTools(
 			}
 			if (!session.proc.killed) {
 				session.proc.kill("SIGKILL");
-				await session.proc.exited;
 			}
+			const exitCode = await session.proc.exited;
 			sessions.delete(sessionId);
 			return {
-				output: "",
+				killed: true as const,
 				status: "exited" as const,
-				exitCode: -1,
+				exitCode,
 			};
 		},
 	});
@@ -295,17 +301,24 @@ export function createBrowserTools(
 			const effective = topic && topic.trim().length > 0 ? topic.trim() : "core";
 			const tokens = effective.split(/\s+/).filter((t) => t.length > 0);
 			const argv = [binPath, "skills", "get", ...tokens];
+			let proc: ReturnType<typeof Bun.spawn>;
 			try {
-				const proc = Bun.spawn(argv, { stdout: "pipe", stderr: "pipe" });
-				const timer = setTimeout(() => {
-					if (!proc.killed) proc.kill("SIGKILL");
-				}, HELP_TIMEOUT);
+				proc = Bun.spawn(argv, { stdout: "pipe", stderr: "pipe" });
+			} catch (err) {
+				return {
+					success: false,
+					error: `failed to run agent-browser (binPath=${binPath}): ${err instanceof Error ? err.message : String(err)}. Check that agent-browser is installed.`,
+				};
+			}
+			const timer = setTimeout(() => {
+				if (!proc.killed) proc.kill("SIGKILL");
+			}, HELP_TIMEOUT);
+			try {
 				const [stdoutText, stderrText, exitCode] = await Promise.all([
 					new Response(proc.stdout as ReadableStream).text(),
 					new Response(proc.stderr as ReadableStream).text(),
 					proc.exited,
 				]);
-				clearTimeout(timer);
 				const body = stripAnsi(stdoutText);
 				if (exitCode !== 0 || body.trim().length === 0) {
 					return {
@@ -314,11 +327,11 @@ export function createBrowserTools(
 					};
 				}
 				return { success: true, topic: effective, instructions: body };
-			} catch (err) {
-				return {
-					success: false,
-					error: `failed to run agent-browser (binPath=${binPath}): ${err instanceof Error ? err.message : String(err)}. Check that agent-browser is installed.`,
-				};
+			} finally {
+				clearTimeout(timer);
+				if (!proc.killed) {
+					proc.kill("SIGKILL");
+				}
 			}
 		},
 	});
