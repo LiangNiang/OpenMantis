@@ -10,7 +10,6 @@ import matter from "gray-matter";
 import { z } from "zod";
 
 const logger = createLogger("core/tools");
-const BROWSER_SKILL_NAME = "agent-browser";
 
 function resolveSkillsRoot(): string {
 	if (isCompiledBinary()) return SKILLS_DIR;
@@ -275,10 +274,7 @@ export async function createSkillTools(config?: OpenMantisConfig) {
 			);
 		} else {
 			try {
-				let skills = await discoverSkills(builtinDir, "skills/builtin");
-				if (config?.browser?.enabled !== true) {
-					skills = skills.filter((s) => s.name !== BROWSER_SKILL_NAME);
-				}
+				const skills = await discoverSkills(builtinDir, "skills/builtin");
 				if (skills.length > 0) {
 					instructions += `${generateSkillInstructions(skills)}\n`;
 					const loaderTool = createSkillLoaderTool(skills);
