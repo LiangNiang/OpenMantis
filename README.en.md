@@ -23,9 +23,9 @@ Connect multiple LLM providers to multiple communication channels with composabl
 - **Multi-LLM-Provider** — OpenAI, Anthropic, Bytedance/Doubao, Xiaomi MiMo, and any OpenAI-compatible endpoint. Switch LLM providers per channel or per message route.
 - **Multi-Channel** — Feishu/Lark, WeCom, QQ. Each channel gets streaming responses and attachment handling. Feishu additionally supports interactive card UI and multiple bot apps per channel.
 - **Composable Tools** — Bash, file I/O, web search (Tavily, Exa), RSS, TTS, memory, scheduling, and more. Enable or disable tool groups via config.
-- **Skills System** — Built-in skills (weather, DOCX/XLSX generation, browser automation, image generation) plus user-defined custom skills.
+- **Skills System** — Built-in skills (weather, DOCX/XLSX generation, frontend design, etc.) plus user-defined custom skills.
 - **Task Scheduler** — Fixed interval, cron expression, or one-time scheduled tasks that execute through the full agent pipeline.
-- **Browser Automation** — Drive a real browser via [agent-browser](https://github.com/vercel-labs/agent-browser) with isolated per-session profiles or CDP mode for reusing your local Chrome.
+- **Browser Automation** — Built-in `browser` tool group drives a real browser via [agent-browser](https://github.com/vercel-labs/agent-browser), with isolated per-session profiles, CDP mode for reusing your local Chrome, and automatic fallback to isolation when CDP is unreachable.
 - **Web Dashboard** — First-run setup wizard and config management UI with i18n (English/Chinese) and provider connection testing.
 - **Extended Thinking** — Reasoning effort control for OpenAI and adaptive thinking for Anthropic models.
 - **Long-Term Memory** — Two-tier memory architecture: core memory for user preferences and key facts, archive memory for chronological decisions and insights. Multi-dimensional recall by keyword, date, and tag, plus automatic memory extraction after conversations.
@@ -165,6 +165,7 @@ Tools are organized into groups and can be toggled via the `excludeTools` config
 | `file` | `file_read`, `file_write`, `file_edit` | Read (with offset/limit), create/overwrite, and partial edit (string replace or line range) |
 | `search` | `file_search`, `content_search` | Glob pattern matching + regex content search (ripgrep backend) |
 | `skills` | `skill_*` | Dynamically generated tool per loaded skill |
+| `browser` | `browser`, `browser_kill`, `browser_help` | Drive a real browser (via agent-browser) with snapshot/ref workflow, isolated profiles or CDP mode, and automatic fallback when CDP is unreachable |
 | `tavily` | `tavilySearch`, `tavilyExtract`, `tavilyCrawl`, `tavilyMap` | Web search, URL content extraction, site crawling, and sitemap generation |
 | `exa` | `exaWebSearch` | Semantic web search via Exa neural search engine |
 | `schedule` | `create_schedule`, `list_schedules`, `get_schedule`, `cancel_schedule`, `edit_schedule` | Create/list/get/cancel/edit scheduled tasks (every/cron/at) |
@@ -185,10 +186,10 @@ Built-in skills are extracted to `~/.openmantis/skills/builtin/` on first run vi
 | `docx` | Create, read, edit, and manipulate Word documents (.docx) |
 | `xlsx` | Work with spreadsheet files (.xlsx, .xlsm, .csv, .tsv) |
 | `weather` | Get current weather and forecasts via wttr.in or Open-Meteo |
-| `image-generate` | Generate images using Doubao Seedream models from text or reference images |
-| `agent-browser` | Browser automation — navigate, fill forms, click, screenshot, extract data |
 | `frontend-design` | Generate production-grade frontend interfaces (React components, dashboards, etc.) |
 | `skill-manager` | Manage the complete lifecycle of OpenMantis skills (create, discover, install, audit) |
+
+> Browser automation has been promoted from a skill into the built-in `browser` tool group — see below.
 
 ## Slash Commands
 
@@ -215,7 +216,7 @@ Users interact with the agent via `/` commands in chat:
 
 ## Browser Automation
 
-OpenMantis can drive a real browser via [agent-browser](https://github.com/vercel-labs/agent-browser).
+OpenMantis drives a real browser via the built-in `browser` tool group, backed by the [agent-browser](https://github.com/vercel-labs/agent-browser) CLI.
 
 ```bash
 npm install -g agent-browser
@@ -232,11 +233,19 @@ Enable in config:
 }
 ```
 
-Each conversation gets an isolated browser profile. For reusing your local Chrome session, enable **CDP mode** instead:
+The agent drives the browser through three tools:
+
+- **`browser_help`** — Loads version-matched agent-browser docs (snapshot/ref workflow, common commands). Call this before non-trivial work.
+- **`browser`** — Runs an agent-browser subcommand (e.g. `["open", "https://..."]`, `["snapshot", "-i"]`). Session flags (`--session`, `--profile`, `--cdp`, `--auto-connect`) are injected automatically and will be rejected if passed in `args`. For stdin subcommands like `eval --stdin`, pass the content via the `stdin` field.
+- **`browser_kill`** — Force-terminates a stuck session (prefer increasing `timeout` over killing).
+
+Each message route gets an isolated browser profile. For reusing your local Chrome session, enable **CDP mode**:
 
 ```bash
 google-chrome --remote-debugging-port=9222
 ```
+
+If the CDP port is unreachable, `browser` automatically falls back to isolation mode for 60 seconds and prefixes its output with `[⚠️ CDP unreachable, ran in isolation mode]`.
 
 > [!IMPORTANT]
 > In CDP mode, conversations share your real browser (cookies, sessions, tabs). Avoid pointing the agent at sensitive accounts.
