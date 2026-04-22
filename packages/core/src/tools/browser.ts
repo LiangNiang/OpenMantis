@@ -260,11 +260,15 @@ export function createBrowserTools(
 				let result = await runProcAttempt(session, timeoutMs);
 				let didFallback = false;
 
-				const naturalExit = !session.proc.killed;
+				// Bun's `proc.killed` is true after ANY exit (natural or signalled), so it
+				// cannot distinguish "agent-browser exited with its own error" from "we
+				// timed out / were killed by browser_kill". Use `signalCode` instead:
+				// null means no signal was received → natural exit → fallback is allowed.
+				const noExternalKill = session.proc.signalCode === null;
 				const shouldFallback =
 					cdpConfigured &&
 					!inFallbackWindow &&
-					naturalExit &&
+					noExternalKill &&
 					detectCdpFailure(result.raw, result.exitCode);
 
 				if (shouldFallback) {
