@@ -8,6 +8,7 @@ import { getSchedulerService } from "../context/scheduler-context";
 const logger = createLogger("core/tools");
 
 import { BASH_TOOL_GUIDE, createBashTools } from "./bash";
+import { BROWSER_TOOL_GUIDE, createBrowserTools } from "./browser";
 import { createExaTools } from "./exa";
 import { createFileTools, FILE_TOOL_GUIDE } from "./file";
 import { createMemoryTools, MEMORY_TOOL_GUIDE } from "./memory";
@@ -51,6 +52,7 @@ export type ChannelToolProviders = Record<string, ChannelToolProvider>;
 
 const ALL_TOOL_GROUPS = [
 	"bash",
+	"browser",
 	"file",
 	"search",
 	"skills",
@@ -80,6 +82,17 @@ export async function resolveTools(
 				const bashTools = createBashTools(config);
 				Object.assign(tools, bashTools);
 				guides.push(BASH_TOOL_GUIDE);
+				break;
+			}
+			case "browser": {
+				if (!config || config.browser?.enabled !== true) break;
+				if (!channelCtx?.routeId) {
+					logger.debug("[resolveTools] skipping browser tools: no routeId");
+					break;
+				}
+				const browserTools = createBrowserTools(config, { routeId: channelCtx.routeId });
+				Object.assign(tools, browserTools);
+				guides.push(BROWSER_TOOL_GUIDE);
 				break;
 			}
 			case "file": {
@@ -199,6 +212,7 @@ export async function resolveTools(
 }
 
 export { createBashTools } from "./bash";
+export { createBrowserTools } from "./browser";
 export { createExaTools } from "./exa";
 export { createFileTools } from "./file";
 export { createMemoryTools } from "./memory";
