@@ -10,7 +10,7 @@
 
 **Deviation from skill default:** 项目无测试套件（user preference in memory）。本计划用 `bun run typecheck` + 手动冒烟替代 TDD 循环。每个任务只做一次 `typecheck`，失败则同步修复再 commit。
 
-**Spec reference:** `dev-docs/specs/2026-04-23-xiaomi-mimo-tts-v2.5-design.md`
+**Spec reference:** `resources/specs/2026-04-23-xiaomi-mimo-tts-v2.5-design.md`
 
 ---
 
