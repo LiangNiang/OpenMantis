@@ -9,6 +9,7 @@ export interface TtsConfig {
 		baseUrl?: string;
 		voice?: string;
 		style?: string;
+		direction?: string;
 	};
 	feishu?: Array<{
 		name: string;

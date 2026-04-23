@@ -2,26 +2,20 @@ import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { createLogger } from "@openmantis/common/logger";
 import { TTS_DIR } from "@openmantis/common/paths";
-import type { TtsProvider } from "@openmantis/common/types/tts";
+import type {
+	SynthesizeOptions,
+	SynthesizeResult,
+	SynthesizeStreamOptions,
+	TtsProvider,
+} from "@openmantis/common/types/tts";
 import { pcmChunksToWav } from "../pcm";
 import type { TtsConfig } from "../types";
 
 const logger = createLogger("tts");
 
 const DEFAULT_BASE_URL = "https://api.xiaomimimo.com/v1";
-
-export interface SynthesizeOptions {
-	text: string;
-	voice?: string;
-	user?: string;
-}
-
-export interface SynthesizeResult {
-	filePath: string;
-	format: "wav";
-	bytes: number;
-	durationMs: number;
-}
+const MODEL_ID = "mimo-v2.5-tts";
+let streamCompatLogged = false;
 
 function wavDurationMs(wav: Buffer): number {
 	// RIFF/WAV: byte rate at offset 28 (UInt32LE), data chunk size at offset 40 (UInt32LE)
@@ -44,10 +38,11 @@ function resolveCreds(config?: TtsConfig): { apiKey: string; baseUrl: string } {
 	return { apiKey, baseUrl };
 }
 
-function buildMessages(text: string, user?: string) {
+function buildMessages(text: string, style?: string, direction?: string) {
 	const messages: Array<{ role: string; content: string }> = [];
-	if (user) messages.push({ role: "user", content: user });
-	messages.push({ role: "assistant", content: text });
+	if (direction) messages.push({ role: "user", content: direction });
+	const content = style ? `(${style})${text.trimStart()}` : text;
+	messages.push({ role: "assistant", content });
 	return messages;
 }
 
@@ -64,9 +59,11 @@ export async function synthesize(
 ): Promise<SynthesizeResult> {
 	const { apiKey, baseUrl } = resolveCreds(config);
 	const voice = options.voice ?? config?.xiaomiTts?.voice ?? "mimo_default";
+	const style = options.style ?? config?.xiaomiTts?.style;
+	const direction = options.direction ?? config?.xiaomiTts?.direction;
 
 	logger.debug(
-		`[tts] synthesize request: voice=${voice}, textLen=${options.text.length}, baseUrl=${baseUrl}, text=${JSON.stringify(options.text)}`,
+		`[tts] synthesize request: voice=${voice}, textLen=${options.text.length}, style=${style ?? "(none)"}, direction=${direction ? "(set)" : "(none)"}, baseUrl=${baseUrl}`,
 	);
 
 	const startMs = Date.now();
@@ -78,8 +75,8 @@ export async function synthesize(
 			"Content-Type": "application/json",
 		},
 		body: JSON.stringify({
-			model: "mimo-v2-tts",
-			messages: buildMessages(options.text, options.user),
+			model: MODEL_ID,
+			messages: buildMessages(options.text, style, direction),
 			audio: { format: "wav", voice },
 		}),
 	});
@@ -105,15 +102,13 @@ export async function synthesize(
 	return { filePath, format: "wav", bytes: buf.length, durationMs };
 }
 
-export interface SynthesizeStreamOptions {
-	text: string;
-	voice?: string;
-	user?: string;
-}
-
 /**
  * Stream pcm16 audio from Xiaomi MIMO TTS, materialize into a WAV file
  * once the stream completes. Returns the file path.
+ *
+ * Note: v2.5-tts streaming currently runs in compatibility mode (server emits
+ * the full buffer once all inference completes), so there is no first-byte
+ * latency advantage over non-streaming. API shape is unchanged.
  */
 export async function synthesizeStream(
 	options: SynthesizeStreamOptions,
@@ -121,9 +116,18 @@ export async function synthesizeStream(
 ): Promise<SynthesizeResult> {
 	const { apiKey, baseUrl } = resolveCreds(config);
 	const voice = options.voice ?? config?.xiaomiTts?.voice ?? "mimo_default";
+	const style = options.style ?? config?.xiaomiTts?.style;
+	const direction = options.direction ?? config?.xiaomiTts?.direction;
+
+	if (!streamCompatLogged) {
+		logger.info(
+			"[tts] v2.5-tts streaming runs in compatibility mode — no first-byte latency improvement over non-stream",
+		);
+		streamCompatLogged = true;
+	}
 
 	logger.debug(
-		`[tts] synthesize stream request: voice=${voice}, textLen=${options.text.length}, baseUrl=${baseUrl}`,
+		`[tts] synthesize stream request: voice=${voice}, textLen=${options.text.length}, style=${style ?? "(none)"}, direction=${direction ? "(set)" : "(none)"}, baseUrl=${baseUrl}`,
 	);
 
 	const startMs = Date.now();
@@ -136,8 +140,8 @@ export async function synthesizeStream(
 			Accept: "text/event-stream",
 		},
 		body: JSON.stringify({
-			model: "mimo-v2-tts",
-			messages: buildMessages(options.text, options.user),
+			model: MODEL_ID,
+			messages: buildMessages(options.text, style, direction),
 			audio: { format: "pcm16", voice },
 			stream: true,
 		}),

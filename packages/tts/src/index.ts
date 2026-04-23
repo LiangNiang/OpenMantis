@@ -4,7 +4,7 @@ export type {
 	SynthesizeOptions,
 	SynthesizeResult,
 	SynthesizeStreamOptions,
-} from "./providers/xiaomi";
+} from "@openmantis/common/types/tts";
 export { synthesize, synthesizeStream } from "./providers/xiaomi";
 export { getTtsProvider } from "./registry";
 export type { TtsProvider } from "@openmantis/common/types/tts";
