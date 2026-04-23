@@ -1,5 +1,3 @@
-// === inlined from packages/core/src/tts/providers/xiaomi.ts ===
-
 export interface SynthesizeOptions {
 	text: string;
 	voice?: string;
