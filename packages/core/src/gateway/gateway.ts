@@ -154,7 +154,7 @@ async function maybeRunAutoTts(params: {
 	try {
 		const useStream = config.xiaomiTts?.stream ?? true;
 		logger.info(
-			`[gateway] auto-tts triggered: channel=${channel.channelType}, provider=${provider.name}, textLen=${text.length}, stream=${useStream}, style=${config.xiaomiTts?.style ?? "(none)"}, direction=${config.xiaomiTts?.direction ? "(set)" : "(none)"}`,
+			`[gateway] auto-tts triggered: channel=${channel.channelType}, provider=${provider.name}, textLen=${text.length}, stream=${useStream}, style=${config.xiaomiTts?.style || "(none)"}, direction=${config.xiaomiTts?.direction ? "(set)" : "(none)"}`,
 		);
 		const result = useStream
 			? await provider.synthesizeStream({ text }, config)

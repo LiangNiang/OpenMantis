@@ -63,7 +63,7 @@ export async function synthesize(
 	const direction = options.direction ?? config?.xiaomiTts?.direction;
 
 	logger.debug(
-		`[tts] synthesize request: voice=${voice}, textLen=${options.text.length}, style=${style ?? "(none)"}, direction=${direction ? "(set)" : "(none)"}, baseUrl=${baseUrl}`,
+		`[tts] synthesize request: voice=${voice}, textLen=${options.text.length}, style=${style || "(none)"}, direction=${direction ? "(set)" : "(none)"}, baseUrl=${baseUrl}`,
 	);
 
 	const startMs = Date.now();
@@ -127,7 +127,7 @@ export async function synthesizeStream(
 	}
 
 	logger.debug(
-		`[tts] synthesize stream request: voice=${voice}, textLen=${options.text.length}, style=${style ?? "(none)"}, direction=${direction ? "(set)" : "(none)"}, baseUrl=${baseUrl}`,
+		`[tts] synthesize stream request: voice=${voice}, textLen=${options.text.length}, style=${style || "(none)"}, direction=${direction ? "(set)" : "(none)"}, baseUrl=${baseUrl}`,
 	);
 
 	const startMs = Date.now();

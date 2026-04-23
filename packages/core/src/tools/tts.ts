@@ -15,7 +15,7 @@ export function createTtsTools(config: OpenMantisConfig, channel?: ChannelContex
 	return {
 		tts_speak: tool({
 			description:
-				"使用小米 MiMo v2.5-TTS 合成语音。生成的 WAV 保存到 .openmantis/tts/，飞书/企微会话会自动作为语音消息发送。\n\n三种风格控制方式（可组合）：\n- style：短风格标签，会拼成 `(xx)` 前缀。例：开心、慵懒、东北话、夹子音、孙悟空、唱歌。多个用空格分隔。\n- direction（可选）：自然语言表演指导，适合段落级情感刻画和\"角色/场景/指导\"导演模式。\n- 文本内细粒度标签：在 text 任意位置插入中文括号标签，如（紧张，深呼吸）、（咳嗽）、（语速加快）、（苦笑）、（小声）。可与 style 组合。\n\n示例：style=\"开心\" text=\"（小声）告诉你一个秘密哦……（语速加快）我中奖啦！\"",
+				'使用小米 MiMo v2.5-TTS 合成语音。生成的 WAV 保存到 .openmantis/tts/，飞书/企微会话会自动作为语音消息发送。\n\n三种风格控制方式（可组合）：\n- style：短风格标签，会拼成 `(xx)` 前缀。例：开心、慵懒、东北话、夹子音、孙悟空、唱歌。多个用空格分隔。\n- direction（可选）：自然语言表演指导，适合段落级情感刻画和"角色/场景/指导"导演模式。\n- 文本内细粒度标签：在 text 任意位置插入中文括号标签，如（紧张，深呼吸）、（咳嗽）、（语速加快）、（苦笑）、（小声）。可与 style 组合。\n\n示例：style="开心" text="（小声）告诉你一个秘密哦……（语速加快）我中奖啦！"',
 			inputSchema: z.object({
 				text: z.string().describe("要合成的文本，最长 2000 字符"),
 				voice: z
@@ -43,7 +43,7 @@ export function createTtsTools(config: OpenMantisConfig, channel?: ChannelContex
 			}),
 			execute: async ({ text, voice, style, direction, stream }) => {
 				logger.debug(
-					`[tool:tts] called: textLen=${text.length}, voice=${voice ?? "(default)"}, style=${style ?? "(none)"}, direction=${direction ? "(set)" : "(none)"}, stream=${stream ?? false}, text=${JSON.stringify(text)}`,
+					`[tool:tts] called: textLen=${text.length}, voice=${voice ?? "(default)"}, style=${style || "(none)"}, direction=${direction ? "(set)" : "(none)"}, stream=${stream ?? false}, text=${JSON.stringify(text)}`,
 				);
 				const trimmed = text.trim();
 				if (!trimmed) return { error: "text 不能为空" };
