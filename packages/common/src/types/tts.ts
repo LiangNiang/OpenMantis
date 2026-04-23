@@ -3,7 +3,8 @@
 export interface SynthesizeOptions {
 	text: string;
 	voice?: string;
-	user?: string;
+	style?: string;
+	direction?: string;
 }
 
 export interface SynthesizeResult {
@@ -16,7 +17,8 @@ export interface SynthesizeResult {
 export interface SynthesizeStreamOptions {
 	text: string;
 	voice?: string;
-	user?: string;
+	style?: string;
+	direction?: string;
 }
 
 export interface TtsProvider<TConfig = unknown> {
