@@ -66,6 +66,7 @@ export class RouteStore {
 				connectedChannels: data.connectedChannels ?? [],
 				createdAt: data.createdAt,
 				updatedAt: data.updatedAt,
+				recaps: data.recaps ?? [],
 			};
 			this.cache.set(id, route);
 			this.cacheTime.set(id, Date.now());
@@ -90,6 +91,7 @@ export class RouteStore {
 					createdAt: route.createdAt,
 					updatedAt: route.updatedAt,
 					messages: route.messages,
+					recaps: route.recaps,
 				},
 				null,
 				2,

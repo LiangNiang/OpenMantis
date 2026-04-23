@@ -1,4 +1,5 @@
 import type { ModelMessage } from "ai";
+import type { RecapEntry } from "../recap/types";
 
 export interface ChannelRef {
 	channelType: string;
@@ -15,4 +16,5 @@ export interface Route {
 	originChannelId: string;
 	createdAt: number;
 	updatedAt: number;
+	recaps?: RecapEntry[];
 }
