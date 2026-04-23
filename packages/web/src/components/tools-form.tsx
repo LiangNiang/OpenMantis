@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 
 /** Tool groups whose backend registration depends on user-supplied credentials.
  * These default to disabled in the UI when their config is missing. */
@@ -21,6 +22,7 @@ whisper?: { apiKey?: string; baseUrl?: string };
 		baseUrl?: string;
 		voice: string;
 		style?: string;
+		direction?: string;
 		stream: boolean;
 	};
 	bash?: { timeout: number; maxOutputLength: number; silenceTimeout: number };
@@ -47,21 +49,39 @@ const DEFAULT_XIAOMI_TTS = {
 	enabled: false,
 	voice: "mimo_default",
 	style: "",
+	direction: "",
 	stream: true,
 };
 
-const XIAOMI_TTS_VOICES = [
+const XIAOMI_TTS_VOICES: Array<{ value: string; labelKey?: string }> = [
 	{ value: "mimo_default", labelKey: "xiaomiTts.voiceMimoDefault" },
-	{ value: "default_zh", labelKey: "xiaomiTts.voiceDefaultZh" },
-	{ value: "default_en", labelKey: "xiaomiTts.voiceDefaultEn" },
+	{ value: "冰糖" },
+	{ value: "茉莉" },
+	{ value: "苏打" },
+	{ value: "白桦" },
+	{ value: "Mia" },
+	{ value: "Chloe" },
+	{ value: "Milo" },
+	{ value: "Dean" },
 ];
 
 const XIAOMI_TTS_STYLE_PRESETS = [
-	"开心", "悲伤", "生气",
-	"变快", "变慢",
-	"悄悄话", "夹子音", "台湾腔",
+	// 基础情绪
+	"开心", "悲伤", "愤怒", "惊讶", "兴奋", "平静",
+	// 复合情绪
+	"怅然", "欣慰", "无奈", "释然",
+	// 整体语调
+	"温柔", "高冷", "活泼", "严肃", "慵懒",
+	// 音色定位
+	"磁性", "醇厚", "清亮", "甜美", "沙哑",
+	// 人设腔调
+	"夹子音", "御姐音", "正太音", "大叔音", "台湾腔",
+	// 方言
 	"东北话", "四川话", "河南话", "粤语",
+	// 角色扮演
 	"孙悟空", "林黛玉",
+	// 唱歌
+	"唱歌",
 ];
 
 interface ToolsFormProps {
@@ -205,7 +225,7 @@ export function ToolsForm({ values, onChange }: ToolsFormProps) {
 								<SelectContent>
 									{XIAOMI_TTS_VOICES.map((v) => (
 										<SelectItem key={v.value} value={v.value}>
-											{t(v.labelKey)}
+											{v.labelKey ? t(v.labelKey) : v.value}
 										</SelectItem>
 									))}
 								</SelectContent>
@@ -238,6 +258,16 @@ export function ToolsForm({ values, onChange }: ToolsFormProps) {
 									))}
 								</div>
 							</div>
+						</div>
+						<div className="flex flex-col gap-2">
+							<Label>{t("xiaomiTts.direction.label")}</Label>
+							<p className="text-xs text-muted-foreground">{t("xiaomiTts.direction.helper")}</p>
+							<Textarea
+								value={values.xiaomiTts?.direction ?? ""}
+								placeholder={t("xiaomiTts.direction.placeholder")}
+								onChange={(e) => updateXiaomiTts("direction", e.target.value)}
+								rows={3}
+							/>
 						</div>
 						<div className="flex items-center justify-between">
 							<div>
