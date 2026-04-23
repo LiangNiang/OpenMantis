@@ -84,10 +84,29 @@ function resetSilenceTimer(session: PtySession): void {
 	}, session.silenceTimeoutMs);
 }
 
-function createWaitPromise(session: PtySession): Promise<void> {
+function createWaitPromise(session: PtySession, maxWaitMs?: number): Promise<void> {
 	if (session.status !== "running") return Promise.resolve();
 	return new Promise<void>((resolve) => {
-		session.waitResolve = resolve;
+		let wallClockTimer: ReturnType<typeof setTimeout> | null = null;
+		const done = () => {
+			if (wallClockTimer) {
+				clearTimeout(wallClockTimer);
+				wallClockTimer = null;
+			}
+			resolve();
+		};
+		session.waitResolve = done;
+		if (maxWaitMs !== undefined) {
+			wallClockTimer = setTimeout(() => {
+				if (session.status === "running") {
+					session.status = "waiting_for_input";
+					logger.debug(
+						`[tool:bash] session ${session.id} call timeout (${maxWaitMs}ms), status -> waiting_for_input`,
+					);
+				}
+				done();
+			}, maxWaitMs);
+		}
 	});
 }
 
@@ -212,6 +231,7 @@ export function createBashTools(config?: OpenMantisConfig) {
 	const defaultTimeoutMs = config?.bash?.timeout ?? MAX_TIMEOUT;
 	const maxOutputLength = config?.bash?.maxOutputLength ?? 30_000;
 	const silenceTimeoutMs = config?.bash?.silenceTimeout ?? 10_000;
+	const callTimeoutMs = Math.min(config?.bash?.callTimeout ?? 90_000, MAX_TIMEOUT);
 
 	const bash = tool({
 		description: `Execute a shell command and return its output and status. ${getShellEnvironmentHint()}
@@ -219,7 +239,7 @@ export function createBashTools(config?: OpenMantisConfig) {
 All generated files (documents, reports, images, audio, downloads, etc.) MUST end up in ${WORKSPACE_DIR}/. Create the directory first if it doesn't exist. Never leave output files in the project root, skill directories, or other locations.
 When running skill scripts: use ABSOLUTE paths (never cd into the skill directory). If the script supports an output directory flag (--outdir, -o, etc.), use it to write directly to ${WORKSPACE_DIR}/. If not, run the script then move the output files to ${WORKSPACE_DIR}/.
 
-When status is "waiting_for_input", the command produced no output within the silence window. It may still be running normally (network requests, builds, model inference, image generation) or waiting for interactive input. Handle by priority:
+When status is "waiting_for_input", the command either produced no output within the silence window OR hit the per-call time budget while still producing output. The process is still running in the background. It may be a normal long-running task (network requests, builds, model inference, image generation), an interactive prompt, or a runaway loop. Handle by priority:
 1. **Assume long-running first**: For API calls, image/video generation, model inference, downloads, builds, or installs — call bash_wait to continue waiting. Do NOT kill.
 2. **Interactive prompts requiring user info** (sudo/ssh passwords, [y/N] confirmations, login credentials): Ask the user in conversation first, then use bash_write. Never guess passwords.
 3. **Known non-sensitive input** (routine script confirmations): Use bash_write directly.
@@ -245,8 +265,10 @@ When status is "waiting_for_input", the command produced no output within the si
 
 			const session = startSession(command, cwd, timeoutMs, silenceTimeoutMs);
 
-			// Wait for process exit or silence timeout
-			await createWaitPromise(session);
+			// Wait for process exit, silence timeout, or wall-clock call timeout.
+			// The wall-clock cap guards against busy-printing loops that keep resetting
+			// the silence timer and would otherwise pin the stream until total timeout.
+			await createWaitPromise(session, callTimeoutMs);
 
 			const output = getSessionOutput(session, maxOutputLength);
 
@@ -306,8 +328,8 @@ When status is "waiting_for_input", the command produced no output within the si
 			session.proc.terminal!.write(`${input}\n`);
 			logger.debug(`[tool:bash] session ${sessionId} write: "${input}"`);
 
-			// Wait for process exit or silence timeout
-			await createWaitPromise(session);
+			// Wait for process exit, silence timeout, or wall-clock call timeout
+			await createWaitPromise(session, callTimeoutMs);
 
 			const newOutput = stripAnsi(session.output.slice(prevLength).join(""));
 			const truncated = truncateOutput(newOutput, maxOutputLength);
@@ -358,7 +380,8 @@ When status is "waiting_for_input", the command produced no output within the si
 			session.status = "running";
 			resetSilenceTimer(session);
 
-			await createWaitPromise(session);
+			// Wall-clock cap = same waitMs; returns after waitMs even if the process keeps printing.
+			await createWaitPromise(session, waitMs);
 
 			// Restore default silence window for any future writes.
 			session.silenceTimeoutMs = previousSilence;

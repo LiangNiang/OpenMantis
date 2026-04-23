@@ -61,6 +61,7 @@ const bashConfigSchema = z.object({
 	timeout: z.number().default(600_000),
 	maxOutputLength: z.number().default(30_000),
 	silenceTimeout: z.number().default(10_000),
+	callTimeout: z.number().default(90_000),
 });
 
 const browserCdpConfigSchema = z
