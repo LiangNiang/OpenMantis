@@ -17,8 +17,14 @@ export interface RouteSummary {
 }
 
 export class RouteStore {
+	// In-memory cache is the source of truth while the daemon runs. This process
+	// is the sole writer to `.openmantis/routes/*.json`, so once a route is
+	// loaded the cached object stays authoritative until /delete or restart. We
+	// deliberately do NOT re-read from disk on every get(): the previous mtime
+	// check caused cache divergence under concurrent writes (e.g. /recap vs an
+	// inflight agent stream), where two callers would end up mutating different
+	// Route objects and the last save would silently drop the other's changes.
 	private cache = new Map<string, Route>();
-	private cacheTime = new Map<string, number>();
 	private dir: string;
 	private initialized = false;
 	private cdpActive: () => boolean;
@@ -41,17 +47,7 @@ export class RouteStore {
 
 	async get(id: string): Promise<Route | undefined> {
 		const cached = this.cache.get(id);
-		if (cached) {
-			try {
-				const file = Bun.file(this.filePath(id));
-				const stat = await file.stat();
-				if (stat.mtimeMs <= (this.cacheTime.get(id) ?? 0)) return cached;
-			} catch {
-				this.cache.delete(id);
-				this.cacheTime.delete(id);
-				return undefined;
-			}
-		}
+		if (cached) return cached;
 
 		try {
 			const file = Bun.file(this.filePath(id));
@@ -69,7 +65,6 @@ export class RouteStore {
 				recaps: data.recaps ?? [],
 			};
 			this.cache.set(id, route);
-			this.cacheTime.set(id, Date.now());
 			return route;
 		} catch (err) {
 			logger.warn(`[route-store] failed to load route ${id}:`, err);
@@ -98,7 +93,6 @@ export class RouteStore {
 			);
 			await Bun.write(this.filePath(route.id), data);
 			this.cache.set(route.id, route);
-			this.cacheTime.set(route.id, Date.now());
 		} catch (err) {
 			logger.warn("[route-store] failed to save route:", err);
 		}
@@ -106,7 +100,6 @@ export class RouteStore {
 
 	async delete(id: string): Promise<boolean> {
 		this.cache.delete(id);
-		this.cacheTime.delete(id);
 		let ok = true;
 		try {
 			await unlink(this.filePath(id));
