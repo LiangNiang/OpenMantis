@@ -150,20 +150,15 @@ async function maybeRunAutoTts(params: {
 		return;
 	}
 
-	// 6. style injection (provider-specific config still lives in xiaomiTts for now)
-	const styledText = config.xiaomiTts?.style
-		? `<style>${config.xiaomiTts.style}</style>${text}`
-		: text;
-
-	// 7. synthesize + upload
+	// 6. synthesize + upload (style / direction resolved inside provider via config fallback)
 	try {
 		const useStream = config.xiaomiTts?.stream ?? true;
 		logger.info(
-			`[gateway] auto-tts triggered: channel=${channel.channelType}, provider=${provider.name}, textLen=${text.length}, stream=${useStream}, style=${config.xiaomiTts?.style ?? "(none)"}`,
+			`[gateway] auto-tts triggered: channel=${channel.channelType}, provider=${provider.name}, textLen=${text.length}, stream=${useStream}, style=${config.xiaomiTts?.style ?? "(none)"}, direction=${config.xiaomiTts?.direction ? "(set)" : "(none)"}`,
 		);
 		const result = useStream
-			? await provider.synthesizeStream({ text: styledText }, config)
-			: await provider.synthesize({ text: styledText }, config);
+			? await provider.synthesizeStream({ text }, config)
+			: await provider.synthesize({ text }, config);
 		const up = await uploadToChannel(
 			channel,
 			{ filePath: result.filePath, durationMs: result.durationMs },
