@@ -16,6 +16,7 @@
 		"./commands/memory": "./src/commands/memory.ts",
 		"./commands/voice": "./src/commands/voice.ts",
 		"./commands/open-id": "./src/commands/open-id.ts",
+		"./commands/recap": "./src/commands/recap.ts",
 		"./commands/types": "./src/commands/types.ts",
 		"./context/gateway-context": "./src/context/gateway-context.ts",
 		"./context/scheduler-context": "./src/context/scheduler-context.ts",

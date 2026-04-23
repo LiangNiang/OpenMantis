@@ -24,6 +24,7 @@ import {
 } from "@openmantis/core/commands/handlers";
 import { forgetCommand, memoriesCommand, rememberCommand } from "@openmantis/core/commands/memory";
 import { openIdCommand } from "@openmantis/core/commands/open-id";
+import { recapCommand } from "@openmantis/core/commands/recap";
 import { CommandRouter } from "@openmantis/core/commands/router";
 import { scheduleCommand } from "@openmantis/core/commands/schedule";
 import { voiceCommand } from "@openmantis/core/commands/voice";
@@ -203,6 +204,7 @@ export async function main() {
 	router.register(memoriesCommand);
 	router.register(botOpenIdCommand);
 	router.register(openIdCommand);
+	router.register(recapCommand);
 
 	for (const channel of channels) {
 		if ("setCommandRouter" in channel) {
