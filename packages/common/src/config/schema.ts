@@ -54,6 +54,7 @@ const xiaomiTtsConfigSchema = z.object({
 	baseUrl: z.string().optional(),
 	voice: z.string().default("mimo_default"),
 	style: z.string().optional(),
+	direction: z.string().optional(),
 	stream: z.boolean().default(true),
 });
 
