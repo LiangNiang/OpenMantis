@@ -2,7 +2,6 @@
 
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { createLogger } from "@openmantis/common/logger";
 import { ensureDir, memoriesScopeDir } from "@openmantis/common/paths";
 import {
 	MEMORY_INDEX_HARD_LIMIT,
@@ -12,8 +11,6 @@ import {
 	type MemoryScope,
 	type MemoryType,
 } from "./types";
-
-const _logger = createLogger("core/memory");
 
 const INDEX_FILENAME = "MEMORY.md";
 
