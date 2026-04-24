@@ -189,8 +189,6 @@ Built-in skills are extracted to `~/.openmantis/skills/builtin/` on first run vi
 | `frontend-design` | Generate production-grade frontend interfaces (React components, dashboards, etc.) |
 | `skill-manager` | Manage the complete lifecycle of OpenMantis skills (create, discover, install, audit) |
 
-> Browser automation has been promoted from a skill into the built-in `browser` tool group — see below.
-
 ## Slash Commands
 
 Users interact with the agent via `/` commands in chat:
