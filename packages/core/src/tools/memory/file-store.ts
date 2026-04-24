@@ -14,14 +14,18 @@ const logger = createLogger("core/memory");
  * - 英文/数字/_/- 保留
  * - 空格 → _
  * - 其他字符（含中文、emoji）剥离
- * - 全空时返回空串，调用方需要 fallback
+ * - 剥离后若不含任何字母或数字（如纯中文 → 全剥光，或 "张伟-后端组长" → 只剩 "-"），返回空串让调用方走时间戳 fallback
  */
 export function slugify(name: string): string {
-	return name
+	const raw = name
 		.trim()
 		.replace(/\s+/g, "_")
 		.replace(/[^a-zA-Z0-9_-]/g, "")
 		.toLowerCase();
+	// 去掉首尾及连续的分隔符，避免出现 ".md" / "world_-.md" / "user_---.md" 等无信息文件名
+	const cleaned = raw.replace(/^[_-]+|[_-]+$/g, "").replace(/[_-]+/g, "_");
+	if (!/[a-z0-9]/.test(cleaned)) return "";
+	return cleaned;
 }
 
 /** 生成最终文件名：<subject>_<slug>.md，slug 为空时回落到时间戳。 */
