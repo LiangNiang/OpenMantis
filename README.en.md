@@ -28,7 +28,7 @@ Connect multiple LLM providers to multiple communication channels with composabl
 - **Browser Automation** — Built-in `browser` tool group drives a real browser via [agent-browser](https://github.com/vercel-labs/agent-browser), with isolated per-session profiles, CDP mode for reusing your local Chrome, and automatic fallback to isolation when CDP is unreachable.
 - **Web Dashboard** — First-run setup wizard and config management UI with i18n (English/Chinese) and provider connection testing.
 - **Extended Thinking** — Reasoning effort control for OpenAI and adaptive thinking for Anthropic models.
-- **Long-Term Memory** — Two-tier memory architecture: core memory for user preferences and key facts, archive memory for chronological decisions and insights. Multi-dimensional recall by keyword, date, and tag, plus automatic memory extraction after conversations.
+- **Long-Term Memory** — Cognitive-memory-inspired model with four types (semantic / procedural / episodic / prospective) split across global and per-channel scopes. Each entry is a single Markdown file with frontmatter; a per-scope `MEMORY.md` index is always loaded into the system prompt. LLM-based duplicate detection prevents redundant writes.
 - **Session Management** — Persistent message routes with message history and channel-to-message-route bindings.
 
 ## Prerequisites
@@ -172,7 +172,7 @@ Tools are organized into groups and can be toggled via the `excludeTools` config
 | `rss` | `rssFetch`, `rssDiscover` | Parse RSS/Atom feeds and discover feed URLs from websites |
 | `whisper` | `audio_transcribe` | Transcribe audio/video files to text with SRT subtitles and timestamps |
 | `tts` | `tts_speak` | Text-to-speech synthesis via Xiaomi TTS with style/expression support |
-| `memory` | `save_memory`, `recall_memory`, `load_route_context` | Long-term memory (core/archive), keyword/date/tag recall, and past session loading |
+| `memory` | `save_memory`, `forget_memory`, `update_memory`, `load_route_context` | Long-term memory across global / channel scopes with four types (semantic/procedural/episodic/prospective); on-demand reads of single-file entries via the index. Past sessions loaded by routeId. |
 | `message` | `send_message` | Send messages to specified channels (always injected when gateway context available) |
 
 Channel-specific tools (Feishu file uploads, doc creation, etc.) are injected automatically based on the active channel.
@@ -208,9 +208,9 @@ Users interact with the agent via `/` commands in chat:
 | `/channel` | Show current channel type and ID |
 | `/schedule <list\|delete\|pause\|resume>` | Manage scheduled tasks |
 | `/voice [on\|off]` | Toggle TTS voice mode (Feishu/WeCom only) |
-| `/remember <content>` | Save something to core memory |
-| `/forget <keyword>` | Remove matching entries from core memory |
-| `/memories` | Show current core memories |
+| `/remember <content>` | Hint to the agent to call `save_memory` next turn (v2 no longer writes directly from the command — the agent decides type/subject) |
+| `/forget <keyword>` | Fuzzy-match name/description across global + current channel; deletes the file and removes the entry from `MEMORY.md` |
+| `/memories` | Show the `MEMORY.md` indices (global + current channel) |
 | `/bot-open-id` | Show bot open_id (Feishu only) |
 | `/open-id` | Show your Feishu open_id |
 
@@ -266,7 +266,7 @@ Tasks execute through the full agent pipeline and results are delivered to the o
 
 - [ ] **Deep Feishu Integration** — Expand native Feishu capabilities (approvals, calendar, email, docs, etc.)
 - [ ] **Multi-Agent Orchestration** — Support Multi-Agent and Sub-Agent collaboration for complex task decomposition and parallel execution
-- [ ] **Memory System Redesign** — Rearchitect storage and retrieval for better accuracy and scalability
+- [x] **Memory System Redesign** — Rearchitect storage and retrieval for better accuracy and scalability
 - [ ] **Telegram Channel** — Add Telegram Bot adapter
 
 > [PRs welcome!](https://github.com/LiangNiang/OpenMantis/pulls)
