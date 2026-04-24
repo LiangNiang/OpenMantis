@@ -48,6 +48,7 @@ Each scope has a \`MEMORY.md\` index already loaded into your system prompt. Eac
 - User mentions a third-party entity worth remembering (person/pet/org/place) → semantic / subject:world
 - User shares any noteworthy event from their life (illness, job change, move, milestone, purchase, trip, decision, interpersonal episode, achievement, family event, etc.) → episodic
 - User states a future plan / commitment / deadline → prospective
+  - Note: prospective memory records the *fact* so future conversations can reference it. If the user also wants you to *act* at that time (send a reminder, run a task), additionally use \`create_schedule\`. The two are complementary, not exclusive — for "我下周要去日本玩，到时候提醒我带护照" you should call BOTH save_memory (prospective: trip) AND create_schedule (reminder).
 - User mentions an external resource pointer (URL, project ID, dashboard) → semantic / subject:reference
 
 ### When to read (use Read on the file path from the index)
