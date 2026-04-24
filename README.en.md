@@ -102,22 +102,41 @@ openmantis init        # Extract built-in skills (--force to overwrite)
 
 ## Architecture
 
-```
-Channel (Feishu / WeCom / QQ)
-        │
-        ▼
-    Gateway ──► AgentFactory ──► ToolLoopAgent (Vercel AI SDK)
-        │                              │
-  RouteStore +                   resolveTools()
-  ChannelBindings                      │
-        │                        ┌─────┴─────┐
-        ▼                        │  Tools     │
-    Response ◄───────────────────│  Skills    │
-                                 │  Memory    │
-                                 └────────────┘
+```mermaid
+flowchart LR
+    subgraph CH["Channels"]
+        F[Feishu / Lark]
+        W[WeCom]
+        Q[QQ]
+    end
+
+    GW["Gateway<br/>RouteStore · ChannelBindings · Inflight"]
+    AF[AgentFactory]
+    TLA["ToolLoopAgent<br/>Vercel AI SDK"]
+
+    subgraph RES["Per-turn resolution"]
+        PROV[LLM Provider]
+        TLS[Tools / Skills]
+        MEM["MEMORY.md indices<br/>global + channel"]
+    end
+
+    SCH[Scheduler]
+    FS[("~/.openmantis/<br/>routes · memories · schedules")]
+
+    CH -- incoming --> GW
+    GW --> AF
+    RES --> AF
+    AF --> TLA
+    TLA -- response --> GW
+    GW -- outgoing --> CH
+
+    GW <-.persist.-> FS
+    MEM <-.read.-> FS
+    SCH <-.persist.-> FS
+    SCH -. cron / at / interval .-> GW
 ```
 
-Messages flow from a channel adapter through the **Gateway**, which manages sessions (message routes) and creates agents. The **AgentFactory** resolves the appropriate LLM provider, tools, and system prompt, then delegates to a **ToolLoopAgent** for streaming execution.
+Messages flow from a channel adapter into the **Gateway**, which manages sessions (message routes) and creates agents. The **AgentFactory** assembles the LLM provider, tools, and system prompt (including the `MEMORY.md` indices) for each turn, then delegates to a **ToolLoopAgent** for streaming execution. The **Scheduler** can also trigger the full agent pipeline on cron / interval / at schedules.
 
 ## Project Structure
 
@@ -257,6 +276,55 @@ Three scheduling modes for automated tasks:
 - **`at`** — One-time execution at a specific datetime
 
 Tasks execute through the full agent pipeline and results are delivered to the originating channel.
+
+## Memory System
+
+A cognitive-memory-inspired model with four types, organized across **global** and per-**channel** scopes. Each entry is a single Markdown file with frontmatter; a per-scope `MEMORY.md` index is always injected into the system prompt, and individual files are read on demand by the agent.
+
+```mermaid
+flowchart LR
+    subgraph FS["File Layout"]
+        direction TB
+        Root["~/.openmantis/memories/"]
+        Root --> G["global/"]
+        Root --> C["{channelId}/"]
+        G --> GMI["MEMORY.md (index)"]
+        G --> GTY["semantic/ procedural/<br/>episodic/ prospective/<br/>(each: name.md with frontmatter)"]
+        C --> CMI[MEMORY.md]
+        C --> CTY["semantic/ procedural/<br/>episodic/ prospective/"]
+    end
+
+    subgraph LC["Per-turn lifecycle"]
+        direction TB
+        T(("Turn")) --> R["AgentFactory injects<br/>both MEMORY.md indices"]
+        R --> A[Agent runs]
+        A -- save_memory --> WV["validate → normalize dates →<br/>detectConflictV2 (LLM)"]
+        WV -- unique --> WW["writeMemory + appendIndex<br/>(rollback unlink if > 500 lines)"]
+        WV -- "duplicate / conflict" --> SK["Skipped → suggest update_memory"]
+        A -- "forget_memory / update_memory" --> MOD["delete or patch +<br/>sync MEMORY.md"]
+        A -- file_read --> ROD["Read single .md<br/>via indexed path"]
+    end
+
+    FS -.-> R
+    WW -.-> FS
+    MOD -.-> FS
+    ROD -.-> FS
+```
+
+| Type | Cognitive analogue | Use | Required structure |
+|---|---|---|---|
+| `semantic` | Semantic memory | Stable facts about a subject (user identity, third-party entities, external resource pointers) | Free-form body |
+| `procedural` | Procedural memory | How the agent should behave (persona, style, corrections, restrictions) | Body must contain `**Why:**` and `**How to apply:**` |
+| `episodic` | Episodic memory | Past events worth remembering long-term (illness, job change, family events, etc.) | Frontmatter must include `when` (YYYY-MM-DD) |
+| `prospective` | Prospective memory | Future plans / commitments | Frontmatter must include `trigger` or `deadline` |
+
+**Subject** is a frontmatter metadata field: `user` / `agent` / `world` / `reference`.
+
+**Two layers of duplicate defense**:
+1. The agent reads the injected `MEMORY.md` index and proactively skips writes for things it already knows.
+2. When `save_memory` is called, `detectConflictV2` uses an LLM to judge duplicate / conflict and suggests `update_memory` instead.
+
+**Index limits**: `MEMORY.md` soft-warns at 400 lines and hard-caps at 500. Hitting the hard cap rejects the write and rolls back the file that was just created.
 
 ## Roadmap
 

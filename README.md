@@ -102,22 +102,41 @@ openmantis init        # 初始化内置技能（--force 强制覆盖）
 
 ## 架构
 
-```
-通道 (飞书 / 企业微信 / QQ)
-        │
-        ▼
-    Gateway ──► AgentFactory ──► ToolLoopAgent (Vercel AI SDK)
-        │                              │
-  RouteStore +                   resolveTools()
-  ChannelBindings                      │
-        │                        ┌─────┴─────┐
-        ▼                        │  Tools     │
-    Response ◄───────────────────│  Skills    │
-                                 │  Memory    │
-                                 └────────────┘
+```mermaid
+flowchart LR
+    subgraph CH["Channels"]
+        F[Feishu / Lark]
+        W[企业微信 WeCom]
+        Q[QQ]
+    end
+
+    GW["Gateway<br/>RouteStore · ChannelBindings · Inflight"]
+    AF[AgentFactory]
+    TLA["ToolLoopAgent<br/>Vercel AI SDK"]
+
+    subgraph RES["Per-turn resolution"]
+        PROV[LLM Provider]
+        TLS[Tools / Skills]
+        MEM["MEMORY.md indices<br/>global + channel"]
+    end
+
+    SCH[Scheduler]
+    FS[("~/.openmantis/<br/>routes · memories · schedules")]
+
+    CH -- incoming --> GW
+    GW --> AF
+    RES --> AF
+    AF --> TLA
+    TLA -- response --> GW
+    GW -- outgoing --> CH
+
+    GW <-.persist.-> FS
+    MEM <-.read.-> FS
+    SCH <-.persist.-> FS
+    SCH -. cron / at / interval .-> GW
 ```
 
-消息从通道适配器流入 **Gateway**，由其管理会话（消息路由）并创建 Agent。**AgentFactory** 解析对应的 LLM 供应商、工具和系统提示词，然后委托 **ToolLoopAgent** 进行流式执行。
+消息从通道适配器流入 **Gateway**，由其管理会话（消息路由）并创建 Agent。**AgentFactory** 每轮解析 LLM 供应商、工具和系统提示词（含 `MEMORY.md` 索引），然后委托 **ToolLoopAgent** 进行流式执行。**Scheduler** 也可以按 cron / interval / at 触发完整 Agent 管线。
 
 ## 项目结构
 
@@ -257,6 +276,55 @@ google-chrome --remote-debugging-port=9222
 - **`at`** — 一次性定时执行
 
 任务通过完整的 Agent 管线执行，结果发送到创建任务的通道。
+
+## 记忆系统
+
+基于人类认知科学的四类型模型，按 global / channel 双作用域组织。每条记忆是一个带 frontmatter 的独立 Markdown 文件，每作用域一个 `MEMORY.md` 索引始终注入系统提示词，单条文件由 Agent 按需 Read。
+
+```mermaid
+flowchart LR
+    subgraph FS["File Layout"]
+        direction TB
+        Root["~/.openmantis/memories/"]
+        Root --> G["global/"]
+        Root --> C["{channelId}/"]
+        G --> GMI["MEMORY.md (index)"]
+        G --> GTY["semantic/ procedural/<br/>episodic/ prospective/<br/>(each: name.md with frontmatter)"]
+        C --> CMI[MEMORY.md]
+        C --> CTY["semantic/ procedural/<br/>episodic/ prospective/"]
+    end
+
+    subgraph LC["Per-turn lifecycle"]
+        direction TB
+        T(("Turn")) --> R["AgentFactory injects<br/>both MEMORY.md indices"]
+        R --> A[Agent runs]
+        A -- save_memory --> WV["validate → normalize dates →<br/>detectConflictV2 (LLM)"]
+        WV -- unique --> WW["writeMemory + appendIndex<br/>(rollback unlink if > 500 lines)"]
+        WV -- "duplicate / conflict" --> SK["Skipped → suggest update_memory"]
+        A -- "forget_memory / update_memory" --> MOD["delete or patch +<br/>sync MEMORY.md"]
+        A -- file_read --> ROD["Read single .md<br/>via indexed path"]
+    end
+
+    FS -.-> R
+    WW -.-> FS
+    MOD -.-> FS
+    ROD -.-> FS
+```
+
+| 类型 | 对应人类记忆 | 用途 | 强制结构 |
+|---|---|---|---|
+| `semantic` | 语义记忆 | 关于某个主体的稳定事实（用户身份、第三方实体、外部资源指针） | 自由文本 |
+| `procedural` | 程序性记忆 | Agent 应该如何行动（人格、风格、用户对其的纠正/确认） | body 必须含 `**Why:**` 和 `**How to apply:**` |
+| `episodic` | 情景记忆 | 过去发生的有意义事件（生病、跳槽、家庭事件等） | frontmatter 必须有 `when` (YYYY-MM-DD) |
+| `prospective` | 前瞻记忆 | 未来要做 / 会发生的事 | frontmatter 必须有 `trigger` 或 `deadline` |
+
+**主体（subject）** 作为 frontmatter 元数据：`user` / `agent` / `world` / `reference`。
+
+**两层防御避免重复**：
+1. Agent 看到注入的 `MEMORY.md` 索引，可主动识别已存在 memory 不再写
+2. 真调 `save_memory` 时，`detectConflictV2` 用 LLM 判定是否 duplicate / conflict，命中则建议改用 `update_memory`
+
+**索引上限**：`MEMORY.md` 软警告 400 行 / 硬上限 500 行。撞硬线时拒绝写入并回滚已写文件。
 
 ## Roadmap
 
