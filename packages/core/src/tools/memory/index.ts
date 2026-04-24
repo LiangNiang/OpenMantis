@@ -8,8 +8,8 @@ import { tool } from "ai";
 import { z } from "zod";
 import { detectConflictV2 } from "./conflict-v2";
 import { formatDate, normalizeRelativeDates } from "./date-normalize";
-import { writeMemory } from "./file-store";
-import { appendIndex } from "./index-store";
+import { deleteMemoryFile, patchMemory, writeMemory } from "./file-store";
+import { appendIndex, findIndexEntries, removeFromIndex, updateIndexEntry } from "./index-store";
 import {
 	MEMORY_SCOPES,
 	MEMORY_SUBJECTS,
@@ -112,10 +112,7 @@ async function loadRouteMessages(routeId: string): Promise<string> {
 	return JSON.stringify(recent, null, 2);
 }
 
-export function createMemoryTools(ctx: {
-	channelId: string;
-	model?: LanguageModelV3;
-}) {
+export function createMemoryTools(ctx: { channelId: string; model?: LanguageModelV3 }) {
 	const { channelId, model } = ctx;
 	let saveCount = 0;
 
@@ -202,7 +199,10 @@ export function createMemoryTools(ctx: {
 					try {
 						await unlink(written.absolutePath);
 					} catch (unlinkErr) {
-						logger.warn(`[save_memory] rollback unlink failed for ${written.absolutePath}:`, unlinkErr);
+						logger.warn(
+							`[save_memory] rollback unlink failed for ${written.absolutePath}:`,
+							unlinkErr,
+						);
 					}
 					return `Index update failed: ${(err as Error).message}. File rolled back.`;
 				}
@@ -212,7 +212,10 @@ export function createMemoryTools(ctx: {
 					try {
 						await unlink(written.absolutePath);
 					} catch (unlinkErr) {
-						logger.warn(`[save_memory] rollback unlink failed for ${written.absolutePath}:`, unlinkErr);
+						logger.warn(
+							`[save_memory] rollback unlink failed for ${written.absolutePath}:`,
+							unlinkErr,
+						);
 					}
 					return `MEMORY.md hit hard limit (${append.totalLines} > 500 lines). File rolled back. Run /forget on stale entries before retrying.`;
 				}
@@ -236,6 +239,114 @@ export function createMemoryTools(ctx: {
 				} catch (err) {
 					logger.warn("[load_route_context] failed:", err);
 					return `Failed to load route ${id}: ${(err as Error).message}`;
+				}
+			},
+		}),
+
+		forget_memory: tool({
+			description:
+				"Remove a memory by fuzzy keyword match (against name + description). If multiple match, returns candidates and asks for a more specific keyword.",
+			inputSchema: z.object({
+				keyword: z.string().min(1).describe("Fuzzy substring matched against name/description"),
+				scope: z
+					.enum(["global", "channel", "all"] as const)
+					.default("all")
+					.describe("Where to search; default both"),
+			}),
+			async execute({ keyword, scope }): Promise<string> {
+				const scopes: Array<{ scope: MemoryScope; channel?: string }> = [];
+				if (scope === "global" || scope === "all") scopes.push({ scope: "global" });
+				if (scope === "channel" || scope === "all")
+					scopes.push({ scope: "channel", channel: channelId });
+
+				type Hit = {
+					scope: MemoryScope;
+					channel?: string;
+					name: string;
+					description: string;
+					indexPath: string;
+				};
+				const hits: Hit[] = [];
+				for (const s of scopes) {
+					const found = await findIndexEntries({
+						scope: s.scope,
+						channelId: s.channel,
+						keyword,
+					});
+					for (const f of found) {
+						hits.push({
+							scope: s.scope,
+							channel: s.channel,
+							name: f.name,
+							description: f.description,
+							indexPath: f.indexPath,
+						});
+					}
+				}
+
+				if (hits.length === 0) return `No memory matched "${keyword}".`;
+				if (hits.length > 1) {
+					const list = hits
+						.map((h, i) => `${i + 1}. [${h.scope}] ${h.name} — ${h.description} (${h.indexPath})`)
+						.join("\n");
+					return `Multiple matches; refine keyword:\n${list}`;
+				}
+
+				const h = hits[0]!;
+				const [type, filename] = h.indexPath.split("/") as [MemoryType, string];
+				await deleteMemoryFile({ scope: h.scope, channelId: h.channel, type, filename });
+				await removeFromIndex({ scope: h.scope, channelId: h.channel, indexPath: h.indexPath });
+				return `Forgot [${h.scope}] ${h.name}`;
+			},
+		}),
+
+		update_memory: tool({
+			description:
+				"Patch an existing memory. Cannot change type / subject / name / created — for those, forget and re-save.",
+			inputSchema: z.object({
+				scope: z.enum(["global", "channel"] as const),
+				type: z.enum(MEMORY_TYPES),
+				filename: z.string().describe("Filename within the type dir, e.g. agent_chinese_reply.md"),
+				description: z.string().optional(),
+				body: z.string().optional(),
+				when: z.string().optional(),
+				significance: z.enum(["low", "medium", "high"]).optional(),
+				trigger: z.string().optional(),
+				deadline: z.string().optional(),
+			}),
+			async execute(input): Promise<string> {
+				const scope = input.scope as MemoryScope;
+				const channelArg = scope === "global" ? undefined : channelId;
+
+				try {
+					const updated = await patchMemory({
+						scope,
+						channelId: channelArg,
+						type: input.type as MemoryType,
+						filename: input.filename,
+						patch: {
+							description: input.description,
+							body: input.body,
+							when: input.when ? normalizeRelativeDates(input.when) : undefined,
+							significance: input.significance,
+							trigger: input.trigger ? normalizeRelativeDates(input.trigger) : undefined,
+							deadline: input.deadline ? normalizeRelativeDates(input.deadline) : undefined,
+						},
+					});
+					if (input.description !== undefined) {
+						await updateIndexEntry({
+							scope,
+							channelId: channelArg,
+							indexPath: `${input.type}/${input.filename}`,
+							description: input.description,
+						});
+					}
+					return `Updated [${updated.frontmatter.type}/${updated.frontmatter.subject}] "${updated.frontmatter.name}"`;
+				} catch (err: any) {
+					if (err?.code === "ENOENT")
+						return `Memory not found: ${input.scope}/${input.type}/${input.filename}`;
+					logger.error("[update_memory] failed:", err);
+					return `update failed: ${err?.message ?? "unknown"}`;
 				}
 			},
 		}),
