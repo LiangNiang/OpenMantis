@@ -33,7 +33,7 @@ const SECTION_KEYS: Record<SectionId, string[]> = {
 	provider: ["defaultProvider", "providers"],
 	channels: ["channels", "feishu", "wecom", "qq"],
 	tools: ["excludeTools", "tavily", "exa", "whisper", "xiaomiTts", "bash", "browser"],
-	advanced: ["systemPrompt", "maxToolRoundtrips"],
+	advanced: ["systemPrompt", "maxToolRoundtrips", "autoNewRoute"],
 };
 
 const SECTION_ICONS: Record<SectionId, React.ReactNode> = {
@@ -216,6 +216,7 @@ whisper: config.whisper,
 	const [advancedValues, setAdvancedValues] = useState<AdvancedValues>({
 		systemPrompt: config.systemPrompt ?? "",
 		maxToolRoundtrips: config.maxToolRoundtrips ?? 10,
+		autoNewRoute: config.autoNewRoute ?? { enabled: true, idleMinutes: 120, recap: true },
 	});
 
 	const formValuesMap = useMemo<Record<SectionId, Record<string, any>>>(

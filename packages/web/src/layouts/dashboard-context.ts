@@ -28,6 +28,11 @@ export interface ProviderValues {
 export interface AdvancedValues {
 	systemPrompt: string;
 	maxToolRoundtrips: number;
+	autoNewRoute: {
+		enabled: boolean;
+		idleMinutes: number;
+		recap: boolean;
+	};
 }
 
 export interface DashboardOutletContext {

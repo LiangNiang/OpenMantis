@@ -51,6 +51,7 @@ export function Wizard({ onComplete, onCancel }: WizardProps) {
 	const [advancedValues, setAdvancedValues] = useState({
 		systemPrompt: "",
 		maxToolRoundtrips: 50,
+		autoNewRoute: { enabled: true, idleMinutes: 120, recap: true },
 	});
 
 	const canProceed = step !== 0 || providerValues.providers.length > 0;
