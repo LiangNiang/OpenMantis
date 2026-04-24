@@ -10,6 +10,7 @@ import { type ChannelToolProviders, resolveTools } from "../tools";
 
 const logger = createLogger("core/agent");
 
+import { memoriesScopeDir } from "@openmantis/common/paths";
 import { readIndexRaw } from "../tools/memory/index-store";
 import { buildStructuredPrompt } from "./prompts";
 import { createLanguageModel } from "./providers";
@@ -92,12 +93,14 @@ export class AgentFactory {
 			try {
 				const globalIndex = await readIndexRaw("global");
 				if (globalIndex) {
-					instructions += `\n\n## Global Memory (cross-channel)\n${globalIndex}`;
+					const globalDir = memoriesScopeDir("global");
+					instructions += `\n\n## Global Memory (cross-channel)\nFiles live under \`${globalDir}/\`. Read with absolute paths (prepend the base dir to each entry's link).\n${globalIndex}`;
 				}
 				if (options?.channelId) {
 					const channelIndex = await readIndexRaw("channel", options.channelId);
 					if (channelIndex) {
-						instructions += `\n\n## Channel Memory (${options.channelId})\n${channelIndex}`;
+						const channelDir = memoriesScopeDir("channel", options.channelId);
+						instructions += `\n\n## Channel Memory (${options.channelId})\nFiles live under \`${channelDir}/\`. Read with absolute paths (prepend the base dir to each entry's link).\n${channelIndex}`;
 					}
 				}
 			} catch (err) {
