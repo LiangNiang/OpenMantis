@@ -15,6 +15,22 @@ export const TTS_DIR = join(OPENMANTIS_HOME, "tts");
 export const UPLOADS_DIR = join(OPENMANTIS_HOME, "uploads");
 export const TMP_DIR = join(OPENMANTIS_HOME, "tmp");
 export const MEMORIES_DIR = join(OPENMANTIS_HOME, "memories");
+export const MEMORIES_GLOBAL_DIR = join(MEMORIES_DIR, "global");
+
+/** 单 channel 作用域的目录。channelId 不做转义，与现有 routes/ 一致。 */
+export function memoriesChannelDir(channelId: string): string {
+	return join(MEMORIES_DIR, channelId);
+}
+
+/** scope 解析为绝对目录。channelId 在 scope === "global" 时被忽略。 */
+export function memoriesScopeDir(scope: "global" | "channel", channelId?: string): string {
+	if (scope === "global") return MEMORIES_GLOBAL_DIR;
+	if (!channelId) {
+		throw new Error("memoriesScopeDir: channelId is required when scope=channel");
+	}
+	return memoriesChannelDir(channelId);
+}
+
 export const WORKSPACE_DIR = join(OPENMANTIS_HOME, "workspace");
 export const SKILLS_DIR = join(OPENMANTIS_HOME, "skills");
 
