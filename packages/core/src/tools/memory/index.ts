@@ -185,23 +185,34 @@ export function createMemoryTools(ctx: {
 					return `save failed: ${err?.message ?? "unknown"}`;
 				}
 
-				const append = await appendIndex({
-					scope,
-					channelId: channelArg,
-					entry: {
-						type: frontmatter.type,
-						name: frontmatter.name,
-						description: frontmatter.description,
-						indexPath: written.indexPath,
-					},
-				});
+				let append: { totalLines: number; softWarn: boolean; hardLimit: boolean };
+				try {
+					append = await appendIndex({
+						scope,
+						channelId: channelArg,
+						entry: {
+							type: frontmatter.type,
+							name: frontmatter.name,
+							description: frontmatter.description,
+							indexPath: written.indexPath,
+						},
+					});
+				} catch (err) {
+					logger.error("[save_memory] index update failed, rolling back file:", err);
+					try {
+						await unlink(written.absolutePath);
+					} catch (unlinkErr) {
+						logger.warn(`[save_memory] rollback unlink failed for ${written.absolutePath}:`, unlinkErr);
+					}
+					return `Index update failed: ${(err as Error).message}. File rolled back.`;
+				}
 
 				if (append.hardLimit) {
 					// 已经写了文件但索引拒绝写入：回滚文件
 					try {
 						await unlink(written.absolutePath);
-					} catch {
-						/* ignore */
+					} catch (unlinkErr) {
+						logger.warn(`[save_memory] rollback unlink failed for ${written.absolutePath}:`, unlinkErr);
 					}
 					return `MEMORY.md hit hard limit (${append.totalLines} > 500 lines). File rolled back. Run /forget on stale entries before retrying.`;
 				}
