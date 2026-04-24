@@ -1,0 +1,76 @@
+direction: right
+
+# ---- File layout ----
+
+fs: File Layout {
+  direction: down
+
+  root: "~/.openmantis/memories/"
+  g: "global/"
+  c: "{channelId}/"
+  gmi: "MEMORY.md (index)"
+  gty: |md
+    semantic/ procedural/
+    episodic/ prospective/
+    (each: name.md with frontmatter)
+  |
+  cmi: MEMORY.md
+  cty: |md
+    semantic/ procedural/
+    episodic/ prospective/
+  |
+
+  root -> g
+  root -> c
+  g -> gmi
+  g -> gty
+  c -> cmi
+  c -> cty
+}
+
+# ---- Per-turn lifecycle ----
+
+lc: Per-turn lifecycle {
+  direction: down
+
+  turn: Turn {
+    shape: circle
+  }
+  r: |md
+    AgentFactory injects
+    both MEMORY.md indices
+  |
+  a: Agent runs
+  wv: |md
+    validate → normalize dates →
+    detectConflictV2 (LLM)
+  |
+  ww: |md
+    writeMemory + appendIndex
+    (rollback unlink if > 500 lines)
+  |
+  sk: "Skipped → suggest update_memory"
+  mod: |md
+    delete or patch +
+    sync MEMORY.md
+  |
+  rod: |md
+    Read single .md
+    via indexed path
+  |
+
+  turn -> r
+  r -> a
+  a -> wv: save_memory
+  wv -> ww: unique
+  wv -> sk: duplicate / conflict
+  a -> mod: "forget_memory / update_memory"
+  a -> rod: file_read
+}
+
+# ---- Cross-subgraph dashed links ----
+
+fs -> lc.r: {style.stroke-dash: 3}
+lc.ww -> fs: {style.stroke-dash: 3}
+lc.mod -> fs: {style.stroke-dash: 3}
+lc.rod -> fs: {style.stroke-dash: 3}

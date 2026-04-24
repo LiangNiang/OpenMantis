@@ -1,0 +1,76 @@
+direction: right
+
+# ---- File layout ----
+
+fs: 文件布局 {
+  direction: down
+
+  root: "~/.openmantis/memories/"
+  g: "global/"
+  c: "{channelId}/"
+  gmi: "MEMORY.md（索引）"
+  gty: |md
+    semantic/ procedural/
+    episodic/ prospective/
+    （每个文件: name.md 含 frontmatter）
+  |
+  cmi: MEMORY.md
+  cty: |md
+    semantic/ procedural/
+    episodic/ prospective/
+  |
+
+  root -> g
+  root -> c
+  g -> gmi
+  g -> gty
+  c -> cmi
+  c -> cty
+}
+
+# ---- Per-turn lifecycle ----
+
+lc: 每轮生命周期 {
+  direction: down
+
+  turn: 一轮对话 {
+    shape: circle
+  }
+  r: |md
+    AgentFactory 注入
+    两个 MEMORY.md 索引
+  |
+  a: Agent 执行
+  wv: |md
+    校验 → 日期归一化 →
+    detectConflictV2 (LLM)
+  |
+  ww: |md
+    writeMemory + appendIndex
+    （若 > 500 行则回滚 unlink）
+  |
+  sk: "跳过 → 建议调用 update_memory"
+  mod: |md
+    删除或 patch +
+    同步 MEMORY.md
+  |
+  rod: |md
+    通过索引路径
+    读取单个 .md
+  |
+
+  turn -> r
+  r -> a
+  a -> wv: save_memory
+  wv -> ww: 唯一
+  wv -> sk: 重复 / 冲突
+  a -> mod: "forget_memory / update_memory"
+  a -> rod: file_read
+}
+
+# ---- Cross-subgraph dashed links ----
+
+fs -> lc.r: {style.stroke-dash: 3}
+lc.ww -> fs: {style.stroke-dash: 3}
+lc.mod -> fs: {style.stroke-dash: 3}
+lc.rod -> fs: {style.stroke-dash: 3}

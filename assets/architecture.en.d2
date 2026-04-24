@@ -1,0 +1,61 @@
+direction: right
+
+# ---- nodes ----
+
+channels: Channels {
+  feishu: "Feishu / Lark"
+  wecom: WeCom
+  qq: QQ
+}
+
+gateway: |md
+  **Gateway**
+  RouteStore · ChannelBindings · Inflight
+|
+
+agent_factory: AgentFactory
+
+tla: |md
+  **ToolLoopAgent**
+  Vercel AI SDK
+|
+
+resolution: "Per-turn resolution" {
+  provider: LLM Provider
+  tools: Tools / Skills
+  memory: |md
+    **MEMORY.md indices**
+    global + channel
+  |
+}
+
+scheduler: Scheduler
+
+fs: |md
+  ~/.openmantis/
+  routes · memories · schedules
+| {
+  shape: cylinder
+}
+
+# ---- edges ----
+
+channels -> gateway: incoming
+gateway -> agent_factory
+resolution -> agent_factory
+agent_factory -> tla
+tla -> gateway: response
+gateway -> channels: outgoing
+
+gateway <-> fs: persist {
+  style.stroke-dash: 3
+}
+resolution.memory -> fs: read {
+  style.stroke-dash: 3
+}
+scheduler <-> fs: persist {
+  style.stroke-dash: 3
+}
+scheduler -> gateway: "cron / at / interval" {
+  style.stroke-dash: 3
+}

@@ -1,0 +1,61 @@
+direction: right
+
+# ---- nodes ----
+
+channels: 通道 {
+  feishu: "飞书 / Lark"
+  wecom: 企业微信
+  qq: QQ
+}
+
+gateway: |md
+  **Gateway**
+  RouteStore · ChannelBindings · Inflight
+|
+
+agent_factory: AgentFactory
+
+tla: |md
+  **ToolLoopAgent**
+  Vercel AI SDK
+|
+
+resolution: 每轮解析 {
+  provider: LLM 供应商
+  tools: 工具 / 技能
+  memory: |md
+    **MEMORY.md 索引**
+    全局 + 通道
+  |
+}
+
+scheduler: Scheduler
+
+fs: |md
+  ~/.openmantis/
+  routes · memories · schedules
+| {
+  shape: cylinder
+}
+
+# ---- edges ----
+
+channels -> gateway: 消息入站
+gateway -> agent_factory
+resolution -> agent_factory
+agent_factory -> tla
+tla -> gateway: 响应
+gateway -> channels: 消息出站
+
+gateway <-> fs: 持久化 {
+  style.stroke-dash: 3
+}
+resolution.memory -> fs: 读取 {
+  style.stroke-dash: 3
+}
+scheduler <-> fs: 持久化 {
+  style.stroke-dash: 3
+}
+scheduler -> gateway: "cron / at / interval" {
+  style.stroke-dash: 3
+}

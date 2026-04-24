@@ -102,39 +102,7 @@ openmantis init        # Extract built-in skills (--force to overwrite)
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    subgraph CH["Channels"]
-        F[Feishu / Lark]
-        W[WeCom]
-        Q[QQ]
-    end
-
-    GW["Gateway<br/>RouteStore · ChannelBindings · Inflight"]
-    AF[AgentFactory]
-    TLA["ToolLoopAgent<br/>Vercel AI SDK"]
-
-    subgraph RES["Per-turn resolution"]
-        PROV[LLM Provider]
-        TLS[Tools / Skills]
-        MEM["MEMORY.md indices<br/>global + channel"]
-    end
-
-    SCH[Scheduler]
-    FS[("~/.openmantis/<br/>routes · memories · schedules")]
-
-    CH -- incoming --> GW
-    GW --> AF
-    RES --> AF
-    AF --> TLA
-    TLA -- response --> GW
-    GW -- outgoing --> CH
-
-    GW <-.persist.-> FS
-    MEM <-.read.-> FS
-    SCH <-.persist.-> FS
-    SCH -. cron / at / interval .-> GW
-```
+![Architecture](assets/architecture.en.svg)
 
 Messages flow from a channel adapter into the **Gateway**, which manages sessions (message routes) and creates agents. The **AgentFactory** assembles the LLM provider, tools, and system prompt (including the `MEMORY.md` indices) for each turn, then delegates to a **ToolLoopAgent** for streaming execution. The **Scheduler** can also trigger the full agent pipeline on cron / interval / at schedules.
 
@@ -281,35 +249,7 @@ Tasks execute through the full agent pipeline and results are delivered to the o
 
 A cognitive-memory-inspired model with four types, organized across **global** and per-**channel** scopes. Each entry is a single Markdown file with frontmatter; a per-scope `MEMORY.md` index is always injected into the system prompt, and individual files are read on demand by the agent.
 
-```mermaid
-flowchart LR
-    subgraph FS["File Layout"]
-        direction TB
-        Root["~/.openmantis/memories/"]
-        Root --> G["global/"]
-        Root --> C["{channelId}/"]
-        G --> GMI["MEMORY.md (index)"]
-        G --> GTY["semantic/ procedural/<br/>episodic/ prospective/<br/>(each: name.md with frontmatter)"]
-        C --> CMI[MEMORY.md]
-        C --> CTY["semantic/ procedural/<br/>episodic/ prospective/"]
-    end
-
-    subgraph LC["Per-turn lifecycle"]
-        direction TB
-        T(("Turn")) --> R["AgentFactory injects<br/>both MEMORY.md indices"]
-        R --> A[Agent runs]
-        A -- save_memory --> WV["validate → normalize dates →<br/>detectConflictV2 (LLM)"]
-        WV -- unique --> WW["writeMemory + appendIndex<br/>(rollback unlink if > 500 lines)"]
-        WV -- "duplicate / conflict" --> SK["Skipped → suggest update_memory"]
-        A -- "forget_memory / update_memory" --> MOD["delete or patch +<br/>sync MEMORY.md"]
-        A -- file_read --> ROD["Read single .md<br/>via indexed path"]
-    end
-
-    FS -.-> R
-    WW -.-> FS
-    MOD -.-> FS
-    ROD -.-> FS
-```
+![Memory System](assets/memory.en.svg)
 
 | Type | Cognitive analogue | Use | Required structure |
 |---|---|---|---|

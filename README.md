@@ -102,39 +102,7 @@ openmantis init        # 初始化内置技能（--force 强制覆盖）
 
 ## 架构
 
-```mermaid
-flowchart LR
-    subgraph CH["Channels"]
-        F[Feishu / Lark]
-        W[企业微信 WeCom]
-        Q[QQ]
-    end
-
-    GW["Gateway<br/>RouteStore · ChannelBindings · Inflight"]
-    AF[AgentFactory]
-    TLA["ToolLoopAgent<br/>Vercel AI SDK"]
-
-    subgraph RES["Per-turn resolution"]
-        PROV[LLM Provider]
-        TLS[Tools / Skills]
-        MEM["MEMORY.md indices<br/>global + channel"]
-    end
-
-    SCH[Scheduler]
-    FS[("~/.openmantis/<br/>routes · memories · schedules")]
-
-    CH -- incoming --> GW
-    GW --> AF
-    RES --> AF
-    AF --> TLA
-    TLA -- response --> GW
-    GW -- outgoing --> CH
-
-    GW <-.persist.-> FS
-    MEM <-.read.-> FS
-    SCH <-.persist.-> FS
-    SCH -. cron / at / interval .-> GW
-```
+![架构图](assets/architecture.zh.svg)
 
 消息从通道适配器流入 **Gateway**，由其管理会话（消息路由）并创建 Agent。**AgentFactory** 每轮解析 LLM 供应商、工具和系统提示词（含 `MEMORY.md` 索引），然后委托 **ToolLoopAgent** 进行流式执行。**Scheduler** 也可以按 cron / interval / at 触发完整 Agent 管线。
 
@@ -281,35 +249,7 @@ google-chrome --remote-debugging-port=9222
 
 基于人类认知科学的四类型模型，按 global / channel 双作用域组织。每条记忆是一个带 frontmatter 的独立 Markdown 文件，每作用域一个 `MEMORY.md` 索引始终注入系统提示词，单条文件由 Agent 按需 Read。
 
-```mermaid
-flowchart LR
-    subgraph FS["File Layout"]
-        direction TB
-        Root["~/.openmantis/memories/"]
-        Root --> G["global/"]
-        Root --> C["{channelId}/"]
-        G --> GMI["MEMORY.md (index)"]
-        G --> GTY["semantic/ procedural/<br/>episodic/ prospective/<br/>(each: name.md with frontmatter)"]
-        C --> CMI[MEMORY.md]
-        C --> CTY["semantic/ procedural/<br/>episodic/ prospective/"]
-    end
-
-    subgraph LC["Per-turn lifecycle"]
-        direction TB
-        T(("Turn")) --> R["AgentFactory injects<br/>both MEMORY.md indices"]
-        R --> A[Agent runs]
-        A -- save_memory --> WV["validate → normalize dates →<br/>detectConflictV2 (LLM)"]
-        WV -- unique --> WW["writeMemory + appendIndex<br/>(rollback unlink if > 500 lines)"]
-        WV -- "duplicate / conflict" --> SK["Skipped → suggest update_memory"]
-        A -- "forget_memory / update_memory" --> MOD["delete or patch +<br/>sync MEMORY.md"]
-        A -- file_read --> ROD["Read single .md<br/>via indexed path"]
-    end
-
-    FS -.-> R
-    WW -.-> FS
-    MOD -.-> FS
-    ROD -.-> FS
-```
+![记忆系统](assets/memory.zh.svg)
 
 | 类型 | 对应人类记忆 | 用途 | 强制结构 |
 |---|---|---|---|
