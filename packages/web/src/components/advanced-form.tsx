@@ -1,6 +1,7 @@
 import { useLocale } from "@/i18n"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 
 interface AdvancedFormProps {
@@ -46,13 +47,12 @@ export function AdvancedForm({ values, onChange }: AdvancedFormProps) {
 			<div className="flex flex-col gap-2">
 				<Label>{t("advanced.autoNewRoute.enabled")}</Label>
 				<div className="flex items-center gap-2">
-					<input
-						type="checkbox"
+					<Switch
 						checked={values.autoNewRoute.enabled}
-						onChange={(e) =>
+						onCheckedChange={(checked) =>
 							onChange({
 								...values,
-								autoNewRoute: { ...values.autoNewRoute, enabled: e.target.checked },
+								autoNewRoute: { ...values.autoNewRoute, enabled: checked },
 							})
 						}
 					/>
@@ -83,13 +83,12 @@ export function AdvancedForm({ values, onChange }: AdvancedFormProps) {
 			<div className="flex flex-col gap-2">
 				<Label>{t("advanced.autoNewRoute.recap")}</Label>
 				<div className="flex items-center gap-2">
-					<input
-						type="checkbox"
+					<Switch
 						checked={values.autoNewRoute.recap}
-						onChange={(e) =>
+						onCheckedChange={(checked) =>
 							onChange({
 								...values,
-								autoNewRoute: { ...values.autoNewRoute, recap: e.target.checked },
+								autoNewRoute: { ...values.autoNewRoute, recap: checked },
 							})
 						}
 						disabled={!values.autoNewRoute.enabled}
