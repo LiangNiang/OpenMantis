@@ -10,6 +10,7 @@ import { type ChannelToolProviders, resolveTools } from "../tools";
 
 const logger = createLogger("core/agent");
 
+import { readIndexRaw } from "../tools/memory/index-store";
 import { buildStructuredPrompt } from "./prompts";
 import { createLanguageModel } from "./providers";
 import { resolveThinkingOptions } from "./thinking";
@@ -85,7 +86,6 @@ export class AgentFactory {
 
 		// Inject MEMORY.md indices (global + channel) into system prompt
 		try {
-			const { readIndexRaw } = await import("../tools/memory/index-store");
 			const globalIndex = await readIndexRaw("global");
 			if (globalIndex) {
 				instructions += `\n\n## Global Memory (cross-channel)\n${globalIndex}`;
