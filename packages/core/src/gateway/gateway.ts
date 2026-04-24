@@ -1,15 +1,10 @@
 import { getWecomClient } from "@openmantis/channel-wecom";
-import {
-	isBrowserCdpActive,
-	type OpenMantisConfig,
-	resolveProvider,
-} from "@openmantis/common/config/schema";
+import { isBrowserCdpActive, type OpenMantisConfig } from "@openmantis/common/config/schema";
 import { createLogger } from "@openmantis/common/logger";
 import { ROUTES_DIR } from "@openmantis/common/paths";
 import { getTtsProvider, uploadToChannel } from "@openmantis/tts";
 import type { ModelMessage } from "ai";
 import { AgentFactory } from "../agent/factory";
-import { createLanguageModel } from "../agent/providers";
 import type {
 	ChannelAdapter,
 	GatewayResponse,
@@ -17,7 +12,6 @@ import type {
 	OutgoingMessage,
 } from "../channels/types";
 import type { ChannelContext, ChannelToolProviders } from "../tools";
-import { extractMemories } from "../tools/memory/extractor";
 
 const logger = createLogger("core/gateway");
 
@@ -449,28 +443,6 @@ export class Gateway {
 						finalText: content,
 						config: this.config,
 					});
-
-					// Async memory extraction (fire-and-forget, non-blocking)
-					if (this.config.memory?.enabled !== false && this.config.memory?.autoExtract !== false) {
-						const memMinMessages = this.config.memory?.autoExtractMinMessages ?? 3;
-						(async () => {
-							try {
-								const provName = route!.provider ?? this.config.defaultProvider;
-								const provConfig = resolveProvider(this.config, provName);
-								const modelConfig = provConfig.models[0]!;
-								const memModel = await createLanguageModel(provConfig, modelConfig);
-								await extractMemories({
-									messages: route!.messages,
-									model: memModel,
-									channelId: incoming.channelId,
-									routeId: route!.id,
-									minMessages: memMinMessages,
-								});
-							} catch (err) {
-								logger.warn("[gateway] memory extraction failed:", err);
-							}
-						})();
-					}
 
 					return {
 						content,
