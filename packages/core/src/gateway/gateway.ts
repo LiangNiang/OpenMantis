@@ -310,7 +310,9 @@ export class Gateway {
 			isRouteStale(route, autoNewCfg.idleMinutes)
 		) {
 			const oldRoute = route;
-			const newId = `${incoming.channelType}-${incoming.channelId}-${Date.now()}`;
+			// channelId already carries the channel-type prefix (e.g. `feishu:main-oc_...`,
+			// `wecom-...`, `qq-...`), so don't prepend channelType again.
+			const newId = `${incoming.channelId}-${Date.now()}`;
 			logger.info(
 				`[gateway] auto-new triggered: chat=${incoming.channelType}/${incoming.channelId}, ` +
 					`old=${oldRoute.id} (idle ${Math.round((Date.now() - oldRoute.updatedAt) / 60_000)}m, ` +
