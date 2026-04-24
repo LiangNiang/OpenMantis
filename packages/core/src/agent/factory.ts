@@ -7,7 +7,6 @@ import { createLogger } from "@openmantis/common/logger";
 import { MESSAGE_SOURCE } from "@openmantis/common/types/channels";
 import { type ModelMessage, stepCountIs, type Tool, ToolLoopAgent, wrapLanguageModel } from "ai";
 import { type ChannelToolProviders, resolveTools } from "../tools";
-import { memoryStore } from "../tools/memory";
 
 const logger = createLogger("core/agent");
 
@@ -84,16 +83,21 @@ export class AgentFactory {
 			instructions += `\n\n## 可用技能\n\n${skillInstructions.trim()}`;
 		}
 
-		// Inject core memory into system prompt
-		if (options?.channelType && options?.channelId) {
-			try {
-				const coreMemory = await memoryStore.loadCore(options.channelId);
-				if (coreMemory.trim()) {
-					instructions += `\n\n## Memory\n你对这个用户了解如下：\n${coreMemory.trim()}`;
-				}
-			} catch (err) {
-				logger.warn("[agent] failed to load core memory, skipping:", err);
+		// Inject MEMORY.md indices (global + channel) into system prompt
+		try {
+			const { readIndexRaw } = await import("../tools/memory/index-store");
+			const globalIndex = await readIndexRaw("global");
+			if (globalIndex) {
+				instructions += `\n\n## Global Memory (cross-channel)\n${globalIndex}`;
 			}
+			if (options?.channelId) {
+				const channelIndex = await readIndexRaw("channel", options.channelId);
+				if (channelIndex) {
+					instructions += `\n\n## Channel Memory (${options.channelId})\n${channelIndex}`;
+				}
+			}
+		} catch (err) {
+			logger.warn("[agent] failed to load memory indices, skipping:", err);
 		}
 
 		if (process.env.DEBUG_PROMPT === "true") {
