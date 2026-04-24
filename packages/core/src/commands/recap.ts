@@ -1,6 +1,6 @@
 import { createLogger } from "@openmantis/common/logger";
-import { generateRecap } from "../recap/summarizer";
-import type { GenerateRecapOutput, RecapEntry, RecapResult } from "../recap/types";
+import { archiveRouteWithRecap } from "../recap/summarizer";
+import type { RecapEntry, RecapResult } from "../recap/types";
 import type { CommandContext, CommandDefinition, CommandResult } from "./types";
 
 const logger = createLogger("core/recap");
@@ -34,32 +34,19 @@ export const recapCommand: CommandDefinition = {
 			return { type: "display", text: "会话未找到" };
 		}
 
-		let output: GenerateRecapOutput;
+		let entry: RecapEntry;
 		try {
-			output = await generateRecap({ route, config: ctx.config });
+			entry = await archiveRouteWithRecap({
+				route,
+				config: ctx.config,
+				routeStore: ctx.routeStore,
+			});
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
 			logger.warn(`[recap] generation failed for route=${ctx.currentRouteId}: ${message}`);
 			return { type: "display", text: `生成 recap 失败：${message}` };
 		}
 
-		const entry: RecapEntry = {
-			id: crypto.randomUUID().slice(0, 8),
-			createdAt: Date.now(),
-			messageCount: route.messages.length,
-			provider: output.provider,
-			modelId: output.modelId,
-			result: output.result,
-		};
-
-		route.recaps = [...(route.recaps ?? []), entry];
-
-		try {
-			await ctx.routeStore.save(route);
-		} catch (err) {
-			logger.warn("[recap] save route failed (non-fatal):", err);
-		}
-
-		return { type: "display", text: renderRecap(output.result) };
+		return { type: "display", text: renderRecap(entry.result) };
 	},
 };

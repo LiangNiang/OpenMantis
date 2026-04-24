@@ -5,7 +5,8 @@ import { generateText, type ModelMessage, Output } from "ai";
 import { z } from "zod";
 import { createLanguageModel } from "../agent/providers";
 import type { Route } from "../gateway/route";
-import type { GenerateRecapOutput, RecapResult } from "./types";
+import type { RouteStore } from "../gateway/route-store";
+import type { GenerateRecapOutput, RecapEntry, RecapResult } from "./types";
 
 const logger = createLogger("core/recap");
 
@@ -115,4 +116,28 @@ async function runSummarization(model: LanguageModelV3, prompt: string): Promise
 		throw new Error(`recap JSON schema mismatch: ${validated.error.message}`);
 	}
 	return validated.data;
+}
+
+export async function archiveRouteWithRecap(params: {
+	route: Route;
+	config: OpenMantisConfig;
+	routeStore: RouteStore;
+}): Promise<RecapEntry> {
+	const { route, config, routeStore } = params;
+	const output = await generateRecap({ route, config });
+	const entry: RecapEntry = {
+		id: crypto.randomUUID().slice(0, 8),
+		createdAt: Date.now(),
+		messageCount: route.messages.length,
+		provider: output.provider,
+		modelId: output.modelId,
+		result: output.result,
+	};
+	route.recaps = [...(route.recaps ?? []), entry];
+	try {
+		await routeStore.save(route);
+	} catch (err) {
+		logger.warn(`[recap] save route failed (non-fatal): route=${route.id}`, err);
+	}
+	return entry;
 }
