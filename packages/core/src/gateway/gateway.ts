@@ -11,14 +11,13 @@ import type {
 	IncomingMessage,
 	OutgoingMessage,
 } from "../channels/types";
-import type { ChannelContext, ChannelToolProviders } from "../tools";
-
-const logger = createLogger("core/gateway");
-
 import { archiveRouteWithRecap } from "../recap/summarizer";
+import type { ChannelContext, ChannelToolProviders } from "../tools";
 import type { ChannelBindings } from "./channel-bindings";
 import { RouteStore } from "./route-store";
 import { toStreamEvents } from "./stream-events";
+
+const logger = createLogger("core/gateway");
 
 function isRouteStale(
 	route: { updatedAt: number; messages: unknown[] },
