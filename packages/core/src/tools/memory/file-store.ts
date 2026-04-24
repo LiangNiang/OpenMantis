@@ -1,11 +1,13 @@
 // packages/core/src/tools/memory/file-store.ts
 
-import { readdirSync } from "node:fs";
-import { readFile, unlink, writeFile } from "node:fs/promises";
+import { readdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { createLogger } from "@openmantis/common/logger";
 import { ensureDir, memoriesScopeDir } from "@openmantis/common/paths";
 import matter from "gray-matter";
 import type { MemoryEntry, MemoryFrontmatter, MemoryScope, MemoryType } from "./types";
+
+const logger = createLogger("core/memory");
 
 /**
  * 把 name 转为安全的文件名 slug。
@@ -109,7 +111,8 @@ export async function listMemoriesByType(args: {
 	const dir = typeDir(args.scope, args.type, args.channelId);
 	let names: string[] = [];
 	try {
-		names = readdirSync(dir).filter((n) => n.endsWith(".md"));
+		const all = await readdir(dir);
+		names = all.filter((n) => n.endsWith(".md"));
 	} catch {
 		return [];
 	}
@@ -118,8 +121,7 @@ export async function listMemoriesByType(args: {
 		try {
 			out.push(await readMemory({ ...args, filename }));
 		} catch (err) {
-			// 单条解析失败不阻塞，记日志由调用方做
-			void err;
+			logger.warn(`[memory] failed to parse ${filename}, skipping:`, err);
 		}
 	}
 	return out;
