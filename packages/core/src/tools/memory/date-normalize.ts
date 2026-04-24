@@ -29,8 +29,8 @@ export function normalizeRelativeDates(text: string, now: Date = new Date()): st
 	const replacements: Array<[RegExp, (match: string, group?: string) => string]> = [
 		[/今天/g, () => formatDate(now)],
 		[/明天/g, () => formatDate(addDays(now, 1))],
-		[/后天/g, () => formatDate(addDays(now, 2))],
 		[/大后天/g, () => formatDate(addDays(now, 3))],
+		[/后天/g, () => formatDate(addDays(now, 2))],
 		[/昨天/g, () => formatDate(addDays(now, -1))],
 		[/前天/g, () => formatDate(addDays(now, -2))],
 		[/(\d+)\s*天后/g, (_match, n) => formatDate(addDays(now, Number(n)))],
