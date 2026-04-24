@@ -16,7 +16,6 @@ const INDEX_FILENAME = "MEMORY.md";
 
 function indexPath(scope: MemoryScope, channelId?: string): string {
 	const dir = memoriesScopeDir(scope, channelId);
-	ensureDir(dir);
 	return join(dir, INDEX_FILENAME);
 }
 
@@ -80,6 +79,7 @@ export async function writeIndex(
 	entries: MemoryIndexEntry[],
 	channelId?: string,
 ): Promise<void> {
+	ensureDir(memoriesScopeDir(scope, channelId));
 	const path = indexPath(scope, channelId);
 	await writeFile(path, renderIndex(entries), "utf8");
 }
@@ -93,7 +93,7 @@ export interface AppendResult {
 /**
  * 追加一条索引。组内追加到末尾。
  * 返回新索引总行数 + 软/硬阈值标志。
- * 调用方应在硬阈值时拒绝写入文件本身（已经写了就要回滚）。
+ * 若 hardLimit 为 true，本函数未写盘；调用方应跳过 content 文件写入并向用户报错。
  */
 export async function appendIndex(args: {
 	scope: MemoryScope;
