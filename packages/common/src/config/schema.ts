@@ -159,8 +159,6 @@ export type ProviderConfig = z.infer<typeof providerConfigSchema>;
 
 const memoryConfigSchema = z.object({
 	enabled: z.boolean().default(true),
-	autoExtract: z.boolean().default(true),
-	autoExtractMinMessages: z.number().int().positive().default(3),
 });
 
 export const configSchema = z
