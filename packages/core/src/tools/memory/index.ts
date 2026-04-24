@@ -352,18 +352,3 @@ export function createMemoryTools(ctx: { channelId: string; model?: LanguageMode
 		}),
 	};
 }
-
-// 临时 shim：保留旧 export 让外部引用不立刻爆错。Task 8-11 完成后删除。
-export const memoryStore = {
-	loadCore: async (_channelId: string): Promise<string> => "",
-	saveToCore: async (_channelId: string, _section: string, _content: string): Promise<void> => {},
-	removeFromCore: async (_channelId: string, _keyword: string): Promise<number> => 0,
-	saveToArchive: async (_channelId: string, _entry: any): Promise<void> => {},
-};
-export const extractMemories = async () => {
-	logger.warn("extractMemories is deprecated and disabled in v2");
-};
-export function getRecentToolSaves(_routeId: string): string[] {
-	return [];
-}
-export function clearRecentToolSaves(_routeId: string): void {}
