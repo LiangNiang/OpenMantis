@@ -161,6 +161,14 @@ const memoryConfigSchema = z.object({
 	enabled: z.boolean().default(true),
 });
 
+const autoNewRouteSchema = z.object({
+	enabled: z.boolean().default(true),
+	idleMinutes: z.number().int().positive().default(120),
+	recap: z.boolean().default(true),
+});
+
+export type AutoNewRouteConfig = z.infer<typeof autoNewRouteSchema>;
+
 export const configSchema = z
 	.object({
 		defaultProvider: z.string().default("default"),
@@ -193,6 +201,11 @@ wecomDoc: wecomDocConfigSchema.optional(),
 		skills: skillsConfigSchema.optional(),
 		web: webConfigSchema.optional(),
 		memory: memoryConfigSchema.optional(),
+		autoNewRoute: autoNewRouteSchema.default({
+			enabled: true,
+			idleMinutes: 120,
+			recap: true,
+		}),
 	})
 	.refine((c) => new Set(c.providers.map((p) => p.name)).size === c.providers.length, {
 		message: "Provider names must be unique",
