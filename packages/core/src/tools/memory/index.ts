@@ -114,7 +114,6 @@ async function loadRouteMessages(routeId: string): Promise<string> {
 
 export function createMemoryTools(ctx: {
 	channelId: string;
-	routeId: string;
 	model?: LanguageModelV3;
 }) {
 	const { channelId, model } = ctx;

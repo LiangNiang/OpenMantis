@@ -171,7 +171,6 @@ export async function resolveTools(
 				if (!channelCtx) break;
 				const memTools = createMemoryTools({
 					channelId: channelCtx.channelId,
-					routeId: channelCtx.routeId ?? "unknown",
 					model: channelCtx.model,
 				});
 				Object.assign(tools, memTools);
