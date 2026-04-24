@@ -93,7 +93,8 @@ export interface AppendResult {
 /**
  * 追加一条索引。组内追加到末尾。
  * 返回新索引总行数 + 软/硬阈值标志。
- * 若 hardLimit 为 true，本函数未写盘；调用方应跳过 content 文件写入并向用户报错。
+ * 若 hardLimit 为 true，索引未写盘；调用方（典型流程是先写 content 文件再调本函数）
+ * 应回滚已写入的 content 文件，并向用户报错。
  */
 export async function appendIndex(args: {
 	scope: MemoryScope;

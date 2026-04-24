@@ -85,19 +85,24 @@ export class AgentFactory {
 		}
 
 		// Inject MEMORY.md indices (global + channel) into system prompt
-		try {
-			const globalIndex = await readIndexRaw("global");
-			if (globalIndex) {
-				instructions += `\n\n## Global Memory (cross-channel)\n${globalIndex}`;
-			}
-			if (options?.channelId) {
-				const channelIndex = await readIndexRaw("channel", options.channelId);
-				if (channelIndex) {
-					instructions += `\n\n## Channel Memory (${options.channelId})\n${channelIndex}`;
+		// Gate on memory config / excludeTools so prompt stays consistent with tool availability.
+		const memoryEnabled =
+			this.config.memory?.enabled !== false && !this.config.excludeTools.includes("memory");
+		if (memoryEnabled) {
+			try {
+				const globalIndex = await readIndexRaw("global");
+				if (globalIndex) {
+					instructions += `\n\n## Global Memory (cross-channel)\n${globalIndex}`;
 				}
+				if (options?.channelId) {
+					const channelIndex = await readIndexRaw("channel", options.channelId);
+					if (channelIndex) {
+						instructions += `\n\n## Channel Memory (${options.channelId})\n${channelIndex}`;
+					}
+				}
+			} catch (err) {
+				logger.warn("[agent] failed to load memory indices, skipping:", err);
 			}
-		} catch (err) {
-			logger.warn("[agent] failed to load memory indices, skipping:", err);
 		}
 
 		if (process.env.DEBUG_PROMPT === "true") {
