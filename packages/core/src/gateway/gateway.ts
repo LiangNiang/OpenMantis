@@ -15,9 +15,18 @@ import type { ChannelContext, ChannelToolProviders } from "../tools";
 
 const logger = createLogger("core/gateway");
 
+import { archiveRouteWithRecap } from "../recap/summarizer";
 import type { ChannelBindings } from "./channel-bindings";
 import { RouteStore } from "./route-store";
 import { toStreamEvents } from "./stream-events";
+
+function isRouteStale(
+	route: { updatedAt: number; messages: unknown[] },
+	idleMinutes: number,
+): boolean {
+	if (route.messages.length === 0) return false;
+	return Date.now() - route.updatedAt > idleMinutes * 60_000;
+}
 
 async function buildAgentMessages(
 	messages: ModelMessage[],
@@ -263,7 +272,7 @@ export class Gateway {
 	async handleMessage(incoming: IncomingMessage): Promise<GatewayResponse> {
 		const startTime = Date.now();
 
-		const route = await this.routeStore.getOrCreate(
+		let route = await this.routeStore.getOrCreate(
 			incoming.routeId,
 			incoming.channelType,
 			incoming.channelId,
@@ -288,6 +297,54 @@ export class Gateway {
 				})(),
 				response: Promise.resolve(rejected),
 			};
+		}
+
+		// Auto-new-route on idle: if the bound route has been idle past the
+		// configured threshold, archive it (recap, fire-and-forget) and bind
+		// this chat to a fresh empty route before persisting the new message.
+		const autoNewCfg = this.config.autoNewRoute;
+		let _autoNewTriggered = false;
+		if (
+			autoNewCfg.enabled &&
+			!this.inflight.has(route.id) &&
+			isRouteStale(route, autoNewCfg.idleMinutes)
+		) {
+			const oldRoute = route;
+			const newId = `${incoming.channelType}-${incoming.channelId}-${Date.now()}`;
+			logger.info(
+				`[gateway] auto-new triggered: chat=${incoming.channelType}/${incoming.channelId}, ` +
+					`old=${oldRoute.id} (idle ${Math.round((Date.now() - oldRoute.updatedAt) / 60_000)}m, ` +
+					`${oldRoute.messages.length} msgs) -> new=${newId}`,
+			);
+			route = await this.routeStore.create(newId, incoming.channelType, incoming.channelId);
+			if (this.channelBindings) {
+				try {
+					await this.channelBindings.set(incoming.channelType, incoming.channelId, newId);
+				} catch (err) {
+					logger.warn(`[gateway] auto-new: rebind failed (non-fatal): ${err}`);
+				}
+			}
+			_autoNewTriggered = true;
+			if (autoNewCfg.recap && oldRoute.messages.length >= 3) {
+				archiveRouteWithRecap({
+					route: oldRoute,
+					config: this.config,
+					routeStore: this.routeStore,
+				})
+					.then((entry) =>
+						logger.info(
+							`[gateway] auto-new: recap archived old=${oldRoute.id}, recapId=${entry.id}`,
+						),
+					)
+					.catch((err) =>
+						logger.warn(`[gateway] auto-new: recap failed for old=${oldRoute.id}:`, err),
+					);
+			} else {
+				logger.debug(
+					`[gateway] auto-new: skipping recap for old=${oldRoute.id} ` +
+						`(recap=${autoNewCfg.recap}, msgs=${oldRoute.messages.length})`,
+				);
+			}
 		}
 
 		// Persist text content with file annotations
