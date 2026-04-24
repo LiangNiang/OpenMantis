@@ -303,7 +303,7 @@ export class Gateway {
 		// configured threshold, archive it (recap, fire-and-forget) and bind
 		// this chat to a fresh empty route before persisting the new message.
 		const autoNewCfg = this.config.autoNewRoute;
-		let _autoNewTriggered = false;
+		let autoNewTriggered = false;
 		if (
 			autoNewCfg.enabled &&
 			!this.inflight.has(route.id) &&
@@ -324,7 +324,7 @@ export class Gateway {
 					logger.warn(`[gateway] auto-new: rebind failed (non-fatal): ${err}`);
 				}
 			}
-			_autoNewTriggered = true;
+			autoNewTriggered = true;
 			if (autoNewCfg.recap && oldRoute.messages.length >= 3) {
 				archiveRouteWithRecap({
 					route: oldRoute,
@@ -346,6 +346,14 @@ export class Gateway {
 				);
 			}
 		}
+
+		const autoNewPrefix = autoNewTriggered
+			? (() => {
+					const m = autoNewCfg.idleMinutes;
+					const desc = m >= 60 && m % 60 === 0 ? `${m / 60} 小时` : `${m} 分钟`;
+					return `🆕 空闲超过 ${desc}，已开启新对话（旧会话已归档，/list 可查看）\n\n`;
+				})()
+			: "";
 
 		// Persist text content with file annotations
 		const fileCount = incoming.files?.length ?? 0;
@@ -521,6 +529,9 @@ export class Gateway {
 			const signal = controller.signal;
 			async function* wrappedStream(): AsyncGenerator<import("./stream-events").StreamEvent> {
 				try {
+					if (autoNewPrefix) {
+						yield { type: "text-delta", text: autoNewPrefix };
+					}
 					for await (const ev of toStreamEvents(streamResult.fullStream)) {
 						yield ev;
 						if (signal.aborted) break;
@@ -570,6 +581,10 @@ export class Gateway {
 				}
 
 				const outgoing = buildFallbackResponse({ ...result, text: fallbackText });
+
+				if (autoNewPrefix) {
+					outgoing.content = `${autoNewPrefix}${outgoing.content}`;
+				}
 
 				await maybeRunAutoTts({
 					route,
