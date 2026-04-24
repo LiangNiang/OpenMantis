@@ -21,27 +21,6 @@ export type ConflictVerdict =
 			reason: string;
 	  };
 
-const PROMPT = `You are a memory deduplication assistant for a long-term memory system.
-Given EXISTING memory entries (same scope + same type as the candidate) and a CANDIDATE entry,
-decide whether the candidate is:
-
-1. "duplicate" — same fact already recorded; saving would be redundant.
-2. "conflict" — directly contradicts an existing entry; should update existing instead of new save.
-3. "unique" — does not overlap; safe to save as new.
-
-Output JSON only, no other text.
-
-Schemas:
-- {"kind":"unique"}
-- {"kind":"duplicate","indexPath":"<exact indexPath of overlapping existing entry>","reason":"<short>"}
-- {"kind":"conflict","indexPath":"<exact indexPath of contradicted entry>","reason":"<short>"}
-
-EXISTING:
-{EXISTING}
-
-CANDIDATE:
-{CANDIDATE}`;
-
 export async function detectConflictV2(args: {
 	model: LanguageModelV3;
 	scope: MemoryScope;
@@ -65,7 +44,26 @@ export async function detectConflictV2(args: {
 
 	const candText = `name: ${args.candidate.frontmatter.name}\ndescription: ${args.candidate.frontmatter.description}\nbody: ${args.candidate.body}`;
 
-	const prompt = PROMPT.replace("{EXISTING}", existingText).replace("{CANDIDATE}", candText);
+	const prompt = `You are a memory deduplication assistant for a long-term memory system.
+Given EXISTING memory entries (same scope + same type as the candidate) and a CANDIDATE entry,
+decide whether the candidate is:
+
+1. "duplicate" — same fact already recorded; saving would be redundant.
+2. "conflict" — directly contradicts an existing entry; should update existing instead of new save.
+3. "unique" — does not overlap; safe to save as new.
+
+Output JSON only, no other text.
+
+Schemas:
+- {"kind":"unique"}
+- {"kind":"duplicate","indexPath":"<exact indexPath of overlapping existing entry>","reason":"<short>"}
+- {"kind":"conflict","indexPath":"<exact indexPath of contradicted entry>","reason":"<short>"}
+
+EXISTING:
+${existingText}
+
+CANDIDATE:
+${candText}`;
 
 	try {
 		const { text } = await generateText({ model: args.model, prompt });
