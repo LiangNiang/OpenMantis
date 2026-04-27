@@ -4,6 +4,22 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import type { LanguageModelV3 } from "@ai-sdk/provider";
 import type { ModelConfig, ProviderConfig } from "@openmantis/common/config/schema";
+import { type LanguageModelMiddleware, wrapLanguageModel } from "ai";
+
+// DeepSeek's API returns 400 if reasoning_content from a prior assistant turn
+// is replayed (https://api-docs.deepseek.com/zh-cn/guides/reasoning_model).
+// Strip reasoning parts from assistant messages before each request.
+const stripDeepSeekReasoning: LanguageModelMiddleware = {
+	specificationVersion: "v3",
+	transformParams: async ({ params }) => ({
+		...params,
+		prompt: params.prompt.map((m) =>
+			m.role === "assistant"
+				? { ...m, content: m.content.filter((c) => c.type !== "reasoning") }
+				: m,
+		),
+	}),
+};
 
 export async function createLanguageModel(
 	providerConfig: ProviderConfig,
@@ -41,7 +57,10 @@ export async function createLanguageModel(
 				apiKey: providerConfig.apiKey,
 				baseURL: providerConfig.baseUrl || undefined,
 			});
-			return deepseek(model);
+			return wrapLanguageModel({
+				model: deepseek(model),
+				middleware: stripDeepSeekReasoning,
+			});
 		}
 
 		case "xiaomi-mimo": {
