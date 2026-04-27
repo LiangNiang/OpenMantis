@@ -72,6 +72,27 @@ export async function* toStreamEvents(
 			case "finish-step":
 				yield { type: "step-end" };
 				break;
+			case "error": {
+				// Without this branch the upstream provider error gets swallowed,
+				// surfacing only as the generic "No output generated" finalize
+				// failure and hiding the real cause (e.g. DeepSeek API 400).
+				const raw = part.error;
+				let message: string;
+				if (raw instanceof Error) {
+					message = raw.stack ?? `${raw.name}: ${raw.message}`;
+				} else if (typeof raw === "string") {
+					message = raw;
+				} else {
+					try {
+						message = JSON.stringify(raw);
+					} catch {
+						message = String(raw);
+					}
+				}
+				logger.error(`[stream] provider error: ${message}`);
+				yield { type: "error", message };
+				break;
+			}
 		}
 	}
 }
