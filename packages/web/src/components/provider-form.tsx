@@ -26,6 +26,7 @@ const PROVIDER_TYPES = [
 	{ value: "anthropic", label: "Anthropic" },
 	{ value: "bytedance", label: "Bytedance (Doubao)" },
 { value: "xiaomi-mimo", label: "Xiaomi MIMO" },
+	{ value: "deepseek", label: "DeepSeek" },
 	{ value: "openai-compatible", label: "OpenAI Compatible" },
 ];
 
@@ -34,6 +35,7 @@ const PROVIDER_BASE_URLS: Record<string, string> = {
 	anthropic: "",
 	bytedance: "https://ark.cn-beijing.volces.com/api/v3",
 "xiaomi-mimo": "https://api.xiaomimimo.com/v1",
+	deepseek: "https://api.deepseek.com/v1",
 	"openai-compatible": "",
 };
 
