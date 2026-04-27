@@ -1,4 +1,5 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
+import { createDeepSeek } from "@ai-sdk/deepseek";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import type { LanguageModelV3 } from "@ai-sdk/provider";
@@ -33,6 +34,14 @@ export async function createLanguageModel(
 				baseURL: providerConfig.baseUrl || undefined,
 			});
 			return anthropic(model);
+		}
+
+		case "deepseek": {
+			const deepseek = createDeepSeek({
+				apiKey: providerConfig.apiKey,
+				baseURL: providerConfig.baseUrl || undefined,
+			});
+			return deepseek(model);
 		}
 
 		case "xiaomi-mimo": {
