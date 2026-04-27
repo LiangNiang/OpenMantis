@@ -9,13 +9,22 @@ import { ensureParentDir, LOG_FILE } from "../paths";
 
 export { LOG_FILE };
 
+function formatArg(a: unknown): string {
+	if (typeof a === "string") return a;
+	// Native Error has non-enumerable `message`/`stack`, so JSON.stringify
+	// would render it as "{}". Format explicitly to preserve the message.
+	if (a instanceof Error) {
+		const head = `${a.name}: ${a.message}`;
+		return a.stack ? `${head}\n${a.stack}` : head;
+	}
+	return JSON.stringify(a);
+}
+
 function formatLogLine(logObj: LogObject): string {
 	const date = logObj.date.toISOString();
 	const level = logObj.type.toUpperCase().padEnd(5);
 	const tag = logObj.tag ? `[${logObj.tag}] ` : "";
-	const message = logObj.args
-		.map((a) => (typeof a === "string" ? a : JSON.stringify(a)))
-		.join(" ");
+	const message = logObj.args.map(formatArg).join(" ");
 	return `${date} ${level} ${tag}${message}\n`;
 }
 
