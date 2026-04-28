@@ -11,6 +11,7 @@ import type {
 	IncomingMessage,
 	OutgoingMessage,
 } from "../channels/types";
+import { formatRecapNotice } from "../recap/notice";
 import { archiveRouteWithRecap } from "../recap/summarizer";
 import type { ChannelContext, ChannelToolProviders } from "../tools";
 import type { ChannelBindings } from "./channel-bindings";
@@ -332,11 +333,17 @@ export class Gateway {
 					config: this.config,
 					routeStore: this.routeStore,
 				})
-					.then((entry) =>
+					.then(async (entry) => {
 						logger.info(
 							`[gateway] auto-new: recap archived old=${oldRoute.id}, recapId=${entry.id}`,
-						),
-					)
+						);
+						const text = formatRecapNotice(incoming.channelType, entry.result.heading);
+						try {
+							await this.pushMessage(incoming.channelType, incoming.channelId, text);
+						} catch (err) {
+							logger.warn(`[gateway] auto-new: recap notify failed for old=${oldRoute.id}:`, err);
+						}
+					})
 					.catch((err) =>
 						logger.warn(`[gateway] auto-new: recap failed for old=${oldRoute.id}:`, err),
 					);
