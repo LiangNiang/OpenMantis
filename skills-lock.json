@@ -76,6 +76,12 @@
       "sourceType": "github",
       "computedHash": "b122f4d1e91aa1d83027e050b5b37c3156203ee85458d7b1360bc48167c9e02a"
     },
+    "specfusion": {
+      "source": "wxkingstar/SpecFusion",
+      "sourceType": "github",
+      "skillPath": "specfusion/SKILL.md",
+      "computedHash": "23b6c7d5c3818ebc78371975cbcfa23230874c0ecb229cd6e9dd518487e1cc08"
+    },
     "vercel-react-best-practices": {
       "source": "vercel-labs/agent-skills",
       "sourceType": "github",
