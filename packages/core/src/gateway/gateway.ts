@@ -338,6 +338,9 @@ export class Gateway {
 							`[gateway] auto-new: recap archived old=${oldRoute.id}, recapId=${entry.id}`,
 						);
 						const text = formatRecapNotice(incoming.channelType, entry.result.heading);
+						// Inner catch is intentionally separate from the outer .catch:
+						// recap is already persisted to route.recaps[]; push failure must
+						// not be logged as "recap failed" or it loses the distinction.
 						try {
 							await this.pushMessage(incoming.channelType, incoming.channelId, text);
 						} catch (err) {
