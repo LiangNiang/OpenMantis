@@ -14,7 +14,6 @@ import {
 	botOpenIdCommand,
 	channelCommand,
 	clearCommand,
-	deleteCommand,
 	helpCommand,
 	historyCommand,
 	listCommand,
@@ -192,7 +191,6 @@ export async function main() {
 	router.register(newCommand);
 	router.register(clearCommand);
 	router.register(stopCommand);
-	router.register(deleteCommand);
 	router.register(listCommand);
 	router.register(historyCommand);
 	router.register(channelCommand);

@@ -35,41 +35,8 @@ export const newCommand: CommandDefinition = {
 
 export const clearCommand: CommandDefinition = {
 	name: "clear",
-	description: "Clear current route messages",
-	usage: "/clear",
-	type: "local",
-	async execute(ctx: CommandContext): Promise<CommandResult> {
-		const route = await ctx.routeStore.get(ctx.currentRouteId);
-		if (route) {
-			route.messages = [];
-			await ctx.routeStore.save(route);
-		}
-		return { type: "display", text: "Route messages cleared." };
-	},
-};
-
-export const stopCommand: CommandDefinition = {
-	name: "stop",
-	description: "Force-stop the in-flight conversation on the current route",
-	usage: "/stop",
-	type: "local",
-	async execute(ctx: CommandContext): Promise<CommandResult> {
-		const ok = ctx.abortInflight(ctx.currentRouteId);
-		logger.info(
-			`[command] /stop on route=${ctx.currentRouteId} channel=${ctx.channelType}/${ctx.channelId}: ${ok ? "aborted" : "no inflight"}`,
-		);
-		// On success, the in-flight stream itself will surface "⏹ 已停止" feedback
-		// (text marker in CLI/WeCom/QQ, disabled stopped card in Feishu) — no
-		// extra chat reply needed. Only respond visibly when there was nothing to stop.
-		if (ok) return { type: "silent" };
-		return { type: "display", text: "当前没有进行中的对话" };
-	},
-};
-
-export const deleteCommand: CommandDefinition = {
-	name: "delete",
 	description: "Delete a route",
-	usage: "/delete [id]",
+	usage: "/clear [id]",
 	type: "local",
 	async execute(ctx: CommandContext): Promise<CommandResult> {
 		const target = ctx.args[0] ?? ctx.currentRouteId;
@@ -88,6 +55,24 @@ export const deleteCommand: CommandDefinition = {
 		}
 
 		return { type: "display", text: `Route "${target}" deleted.` };
+	},
+};
+
+export const stopCommand: CommandDefinition = {
+	name: "stop",
+	description: "Force-stop the in-flight conversation on the current route",
+	usage: "/stop",
+	type: "local",
+	async execute(ctx: CommandContext): Promise<CommandResult> {
+		const ok = ctx.abortInflight(ctx.currentRouteId);
+		logger.info(
+			`[command] /stop on route=${ctx.currentRouteId} channel=${ctx.channelType}/${ctx.channelId}: ${ok ? "aborted" : "no inflight"}`,
+		);
+		// On success, the in-flight stream itself will surface "⏹ 已停止" feedback
+		// (text marker in CLI/WeCom/QQ, disabled stopped card in Feishu) — no
+		// extra chat reply needed. Only respond visibly when there was nothing to stop.
+		if (ok) return { type: "silent" };
+		return { type: "display", text: "当前没有进行中的对话" };
 	},
 };
 
