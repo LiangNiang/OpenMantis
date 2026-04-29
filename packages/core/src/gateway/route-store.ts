@@ -19,7 +19,7 @@ export interface RouteSummary {
 export class RouteStore {
 	// In-memory cache is the source of truth while the daemon runs. This process
 	// is the sole writer to `.openmantis/routes/*.json`, so once a route is
-	// loaded the cached object stays authoritative until /delete or restart. We
+	// loaded the cached object stays authoritative until /clear or restart. We
 	// deliberately do NOT re-read from disk on every get(): the previous mtime
 	// check caused cache divergence under concurrent writes (e.g. /recap vs an
 	// inflight agent stream), where two callers would end up mutating different
