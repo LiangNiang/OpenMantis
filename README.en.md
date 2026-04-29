@@ -30,6 +30,7 @@ Connect multiple LLM providers to multiple communication channels with composabl
 - **Extended Thinking** — Reasoning effort control for OpenAI and adaptive thinking for Anthropic models.
 - **Long-Term Memory** — Cognitive-memory-inspired model with four types (semantic / procedural / episodic / prospective) split across global and per-channel scopes. Each entry is a single Markdown file with frontmatter; a per-scope `MEMORY.md` index is always loaded into the system prompt. LLM-based duplicate detection prevents redundant writes.
 - **Session Management** — Persistent message routes with message history and channel-to-message-route bindings.
+- **Auto-New Route + Recap** — When a route goes idle past a threshold, the next message starts a fresh route automatically and the old route is asynchronously summarized into a structured recap (goal / decisions / changes / todos), archived into `route.recaps[]`, and announced to the chat. Manual `/recap` is also available.
 
 ## Prerequisites
 
@@ -190,6 +191,7 @@ Users interact with the agent via `/` commands in chat:
 | `/list` | List all message routes |
 | `/history` | Show current message route messages |
 | `/resume <id>` | Resume a previous message route |
+| `/recap` | Generate a structured recap of the current route and archive it (goal / decisions / changes / todos) |
 | `/channel` | Show current channel type and ID |
 | `/schedule <list\|delete\|pause\|resume>` | Manage scheduled tasks |
 | `/voice [on\|off]` | Toggle TTS voice mode (Feishu/WeCom only) |
@@ -265,6 +267,37 @@ A cognitive-memory-inspired model with four types, organized across **global** a
 2. When `save_memory` is called, `detectConflictV2` uses an LLM to judge duplicate / conflict and suggests `update_memory` instead.
 
 **Index limits**: `MEMORY.md` soft-warns at 400 lines and hard-caps at 500. Hitting the hard cap rejects the write and rolls back the file that was just created.
+
+## Auto-New Route & Recap
+
+Long-running chats accumulate stale history and pollute the context. OpenMantis manages session boundaries automatically via **idle-triggered new routes + structured recap archival**, so users don't have to remember `/new`.
+
+**Trigger flow**: when a new message arrives and the bound route has been idle for more than `idleMinutes` (default 120), the gateway:
+
+1. Creates a fresh empty route and rebinds the channel to it.
+2. If the old route has ≥ 3 messages and `recap` is enabled, **asynchronously** asks the LLM to generate a four-section recap (`goal` / `decisions` / `changes` / `todos`) and appends it to `oldRoute.recaps[]`.
+3. Prepends a one-line notice to the first reply on the new route: `🆕 Idle over X minutes — started a new conversation (old route archived, run /list to find it)`.
+4. After the recap completes, pushes a separate dim notice to the channel: `📋 Previous conversation archived: {heading} (run /list)`. Feishu/WeCom render it in grey; QQ falls back to plain text.
+
+Recap is fire-and-forget — recap failure never blocks the main reply, and notify failure never rolls back the persisted recap.
+
+**Config** (`autoNewRoute`, also editable in the web dashboard's Advanced section):
+
+```json
+{
+  "autoNewRoute": {
+    "enabled": true,
+    "idleMinutes": 120,
+    "recap": true
+  }
+}
+```
+
+- `enabled`: when off, routes never auto-switch (original behavior — only manual `/new`).
+- `idleMinutes`: positive integer; how long before a route is considered "done."
+- `recap`: when off, the route still switches but no summary is generated and no archival notice is pushed.
+
+`/recap` can be invoked at any time to synchronously summarize the current route on demand.
 
 ## Roadmap
 
