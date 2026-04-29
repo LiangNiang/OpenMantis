@@ -20,7 +20,7 @@
 
 ## 特性
 
-- **多 LLM 供应商** — OpenAI、Anthropic、字节跳动/豆包、小米 MiMo，以及任意 OpenAI 兼容端点。支持按通道或按会话切换 LLM 供应商。
+- **多 LLM 供应商** — OpenAI、Anthropic、字节跳动/豆包、DeepSeek、小米 MiMo，以及任意 OpenAI 兼容端点。支持按通道或按会话切换 LLM 供应商。
 - **多平台** — 飞书/Lark、企业微信、QQ。每个平台均支持流式响应和附件处理，飞书额外支持交互式卡片 UI 和单渠道接入多个飞书应用。
 - **可组合工具** — Bash、文件读写、网页搜索（Tavily、Exa）、RSS、TTS、记忆、定时任务等。通过配置启用或禁用工具组。
 - **技能系统** — 内置技能（天气、DOCX/XLSX 生成、前端设计等）以及用户自定义技能。
@@ -138,6 +138,7 @@ OpenMantis/
 | OpenAI | `@ai-sdk/openai` | GPT-4o、o 系列等 |
 | Anthropic | `@ai-sdk/anthropic` | Claude，支持自适应思考 |
 | 字节跳动/豆包 | `@ai-sdk/openai-compatible` | 通过火山引擎 Ark |
+| DeepSeek | `@ai-sdk/deepseek` | DeepSeek 官方 API |
 | 小米 MiMo | `@ai-sdk/openai-compatible` | 可选网页搜索插件 |
 | OpenAI 兼容 | `@ai-sdk/openai-compatible` | 任意 OpenAI 兼容端点 |
 

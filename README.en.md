@@ -20,7 +20,7 @@ Connect multiple LLM providers to multiple communication channels with composabl
 
 ## Features
 
-- **Multi-LLM-Provider** — OpenAI, Anthropic, Bytedance/Doubao, Xiaomi MiMo, and any OpenAI-compatible endpoint. Switch LLM providers per channel or per message route.
+- **Multi-LLM-Provider** — OpenAI, Anthropic, Bytedance/Doubao, DeepSeek, Xiaomi MiMo, and any OpenAI-compatible endpoint. Switch LLM providers per channel or per message route.
 - **Multi-Channel** — Feishu/Lark, WeCom, QQ. Each channel gets streaming responses and attachment handling. Feishu additionally supports interactive card UI and multiple bot apps per channel.
 - **Composable Tools** — Bash, file I/O, web search (Tavily, Exa), RSS, TTS, memory, scheduling, and more. Enable or disable tool groups via config.
 - **Skills System** — Built-in skills (weather, DOCX/XLSX generation, frontend design, etc.) plus user-defined custom skills.
@@ -138,6 +138,7 @@ OpenMantis/
 | OpenAI | `@ai-sdk/openai` | GPT-4o, o-series, etc. |
 | Anthropic | `@ai-sdk/anthropic` | Claude with adaptive thinking |
 | Bytedance/Doubao | `@ai-sdk/openai-compatible` | Via Volcengine Ark |
+| DeepSeek | `@ai-sdk/deepseek` | Official DeepSeek API |
 | Xiaomi MiMo | `@ai-sdk/openai-compatible` | Optional web search plugin |
 | OpenAI Compatible | `@ai-sdk/openai-compatible` | Any OpenAI-compatible endpoint |
 
