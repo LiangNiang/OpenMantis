@@ -28,6 +28,14 @@ function isRouteStale(
 	return Date.now() - route.updatedAt > idleMinutes * 60_000;
 }
 
+// IncomingMessage.channelId is the channel-prefixed form (`${type}-${chatId}`),
+// but channel adapters key channelBindings by the bare chatId. Strip the
+// prefix so gateway writes land on the same key channels read from.
+function bindingChatId(channelType: string, channelId: string): string {
+	const prefix = `${channelType}-`;
+	return channelId.startsWith(prefix) ? channelId.slice(prefix.length) : channelId;
+}
+
 async function buildAgentMessages(
 	messages: ModelMessage[],
 	incoming: IncomingMessage,
@@ -321,7 +329,11 @@ export class Gateway {
 			route = await this.routeStore.create(newId, incoming.channelType, incoming.channelId);
 			if (this.channelBindings) {
 				try {
-					await this.channelBindings.set(incoming.channelType, incoming.channelId, newId);
+					await this.channelBindings.set(
+						incoming.channelType,
+						bindingChatId(incoming.channelType, incoming.channelId),
+						newId,
+					);
 				} catch (err) {
 					logger.warn(`[gateway] auto-new: rebind failed (non-fatal): ${err}`);
 				}
@@ -380,7 +392,7 @@ export class Gateway {
 		// Resolve provider: route > channel binding > channel config > default
 		const bindingsProvider = this.channelBindings?.getProvider(
 			incoming.channelType,
-			incoming.channelId,
+			bindingChatId(incoming.channelType, incoming.channelId),
 		);
 		const channelConfigProvider = (() => {
 			const channelConf = this.config[incoming.channelType as keyof OpenMantisConfig];
