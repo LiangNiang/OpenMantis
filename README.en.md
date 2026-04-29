@@ -185,9 +185,8 @@ Users interact with the agent via `/` commands in chat:
 |---------|-------------|
 | `/help` | Show available commands |
 | `/new` | Start a new message route |
-| `/clear` | Clear current message route messages |
+| `/clear [id]` | Delete a message route (without id, deletes the current route and switches to a fresh one) |
 | `/stop` | Force-stop the in-flight conversation |
-| `/delete [id]` | Delete a message route |
 | `/list` | List all message routes |
 | `/history` | Show current message route messages |
 | `/resume <id>` | Resume a previous message route |
