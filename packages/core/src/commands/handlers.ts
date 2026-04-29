@@ -184,6 +184,9 @@ export const resumeCommand: CommandDefinition = {
 			return { type: "display", text: `Route "${target}" not found.` };
 		}
 
+		// Bump updatedAt (save() refreshes it) so the next message doesn't
+		// immediately trip auto-new-route on a long-idle resumed route.
+		await ctx.routeStore.save(route);
 		ctx.switchRoute(route.id);
 		return { type: "display", text: `Resumed route: ${route.id}` };
 	},
