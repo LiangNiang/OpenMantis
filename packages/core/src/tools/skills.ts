@@ -164,13 +164,24 @@ function createSkillLoaderTool(skills: Skill[]): Tool {
 	);
 
 	const inputSchema = z.object({
-		skillName: z.string().describe("The name of the skill to load"),
+		skillName: z
+			.string()
+			.optional()
+			.describe(
+				"Optional. The skill name is already encoded in the tool name (skill_<name>); leave this empty unless you intentionally want to load a different skill.",
+			),
 	});
 
 	return tool({
 		description: descLines.join("\n"),
 		inputSchema,
 		execute: async ({ skillName }: z.infer<typeof inputSchema>) => {
+			if (!skillName) {
+				return {
+					success: false,
+					error: "skillName is missing and no default could be inferred from the tool name.",
+				};
+			}
 			const skill = skillMap.get(skillName);
 			if (!skill) {
 				const available = skills.map((s) => s.name).join(", ");
@@ -198,14 +209,21 @@ function createSkillLoaderTool(skills: Skill[]): Tool {
 	});
 }
 
-function wrapSkillTool(t: Tool): Tool {
+function wrapSkillTool(t: Tool, defaultSkillName: string): Tool {
 	const originalExecute = t.execute;
 	if (!originalExecute) return t;
 
 	return {
 		...t,
 		execute: async (args: any, options: any) => {
-			const result = await originalExecute(args, options);
+			// The tool name (skill_<name>) already identifies which skill to load,
+			// so models that send `{}` shouldn't trigger a tool-error round-trip.
+			const incoming = args && typeof args === "object" ? args : {};
+			const patchedArgs =
+				typeof incoming.skillName === "string" && incoming.skillName
+					? incoming
+					: { ...incoming, skillName: defaultSkillName };
+			const result = await originalExecute(patchedArgs, options);
 			if (result?.success === true && result?.skill?.path) {
 				const skillPath = result.skill.path;
 				const fileList: string[] = Array.isArray(result.files) ? result.files : [];
@@ -278,9 +296,8 @@ export async function createSkillTools(config?: OpenMantisConfig) {
 				if (skills.length > 0) {
 					instructions += `${generateSkillInstructions(skills)}\n`;
 					const loaderTool = createSkillLoaderTool(skills);
-					const wrapped = wrapSkillTool(loaderTool);
 					for (const skill of skills) {
-						tools[`skill_${skill.name}`] = wrapped;
+						tools[`skill_${skill.name}`] = wrapSkillTool(loaderTool, skill.name);
 					}
 					logger.debug(`[skills] loaded ${skills.length} builtin skills`);
 				}
@@ -298,9 +315,8 @@ export async function createSkillTools(config?: OpenMantisConfig) {
 			if (skills.length > 0) {
 				instructions += `${generateSkillInstructions(skills)}\n`;
 				const loaderTool = createSkillLoaderTool(skills);
-				const wrapped = wrapSkillTool(loaderTool);
 				for (const skill of skills) {
-					tools[`skill_${skill.name}`] = wrapped;
+					tools[`skill_${skill.name}`] = wrapSkillTool(loaderTool, skill.name);
 				}
 				logger.debug(`[skills] loaded ${skills.length} custom skills`);
 			}
