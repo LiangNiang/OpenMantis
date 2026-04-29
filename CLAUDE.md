@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-OpenMantis is a multi-platform agentic chat framework that connects LLM providers (OpenAI, Anthropic, Bytedance/Doubao, Xiaomi MiMo, any OpenAI-compatible endpoint) to communication channels (Feishu/Lark, WeCom, QQ) with composable tools, scheduling, and browser automation.
+OpenMantis is a multi-platform agentic chat framework that connects LLM providers (OpenAI, Anthropic, Bytedance/Doubao, DeepSeek, Xiaomi MiMo, any OpenAI-compatible endpoint) to communication channels (Feishu/Lark, WeCom, QQ) with composable tools, scheduling, browser automation, long-term memory, and auto-recap of idle sessions.
 
 Built on **Bun** runtime and **Vercel AI SDK v6**.
 
@@ -103,9 +103,15 @@ Channel (Feishu / WeCom / QQ)
 - `src/index.ts` — Main application logic (invoked by `cli.ts run`)
 - `src/daemon.ts` — Daemon process management (fork/pid/log redirection)
 - `scripts/build.ts` — Binary packaging script (used by `build:bin` / `build:bin:all`)
-- `packages/core/src/agent/providers.ts` — LLM provider instantiation
+- `packages/core/src/lifecycle.ts` — Boot/shutdown wiring for gateway + scheduler + web server
+- `packages/core/src/gateway/` — Channel-agnostic message routing and route lifecycle (idle detection, auto-new-route)
+- `packages/core/src/agent/providers.ts` — LLM provider instantiation (OpenAI / Anthropic / DeepSeek / OpenAI-compatible)
 - `packages/core/src/agent/factory.ts` — Tool resolution and agent creation
-- `packages/core/src/tools/` — All tool implementations (bash, file, search, tavily, schedule, memory, skills, etc.)
+- `packages/core/src/agent/prompts.ts` — System prompt assembly (injects `MEMORY.md` indices, channel context, etc.)
+- `packages/core/src/commands/` — Slash command handlers (`/new`, `/clear`, `/recap`, `/voice`, `/memories`, `/schedule`, …) dispatched via `router.ts`
+- `packages/core/src/recap/` — Idle-route recap generator (LLM-driven `goal/decisions/changes/todos` summary, fire-and-forget)
+- `packages/core/src/tools/` — Tool group implementations (`bash`, `browser`, `exa`, `file`, `memory/`, `message`, `rss`, `schedule`, `search`, `skills`, `tavily`, `tts`, `whisper`)
+- `packages/core/src/channels/` — Channel-side glue used by the gateway (separate from the per-channel adapter packages)
 - `packages/common/src/config/schema.ts` — Zod config validation schema
 - `packages/common/src/paths/index.ts` — Runtime path resolution (reads `OPENMANTIS_DATA_DIR`)
 - `skills/builtin/` — **Source** location of built-in skills (bundled into the binary). At runtime skills live under `$OPENMANTIS_DATA_DIR/skills/builtin/` (populated by `openmantis init`); user-added skills go in `$OPENMANTIS_DATA_DIR/skills/custom/`.
@@ -116,4 +122,12 @@ Route-level override → Channel binding → Channel config → Global default
 
 ### Tool System
 
-Tools are organized by group name and can be excluded via `excludeTools` config. Channel-specific tools are auto-injected based on the active channel. Skills (loaded from `$OPENMANTIS_DATA_DIR/skills/builtin/` and `.../skills/custom/`) are loaded dynamically and exposed as tools.
+Tools are organized into named groups and can be turned off via `excludeTools` config. Built-in groups: `bash`, `file`, `search`, `browser`, `tavily`, `exa`, `rss`, `whisper`, `tts`, `schedule`, `memory`, `message`, `skills`. Channel-specific tools (e.g. Feishu file upload, doc creation) are auto-injected based on the active channel. Skills loaded from `$OPENMANTIS_DATA_DIR/skills/{builtin,custom}/` are exposed dynamically as `skill_*` tools.
+
+### Auto-New-Route + Recap
+
+When a new message arrives on a route that has been idle longer than `autoNewRoute.idleMinutes` (default 120), the gateway transparently creates a fresh route, switches the channel binding to it, and — if the old route had ≥3 messages and `autoNewRoute.recap` is on — kicks off an async LLM-generated structured recap (`goal` / `decisions` / `changes` / `todos`) appended to `oldRoute.recaps[]`. Recap is fire-and-forget; failures don't roll back the route switch. `/recap` performs the same recap synchronously for the current route. Logic lives in `packages/core/src/gateway/` (idle detection) and `packages/core/src/recap/` (summary generation).
+
+### Memory System
+
+Long-term memory is dual-scoped (`global` + per-channel) with four cognitive types: `semantic`, `procedural`, `episodic`, `prospective`. Each memory is a single Markdown file with frontmatter; per scope, a `MEMORY.md` index is always injected into the system prompt while individual memory files are read by the agent on demand. Conflict detection (`detectConflictV2`) uses an LLM to flag duplicates/conflicts before `save_memory` writes. Implementation: `packages/core/src/tools/memory/`.
