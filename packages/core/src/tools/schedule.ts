@@ -82,11 +82,12 @@ function createCreateTool(
 				.describe("执行时间，ISO 8601 格式（如 2026-04-02T07:00:00），仅 at 模式需要"),
 			timezone: z.string().optional().describe("时区（默认 Asia/Shanghai）"),
 			description: z.string().optional().describe("任务描述（人类可读）"),
-			maxExecutions: z
+			maxExecutions: z.coerce
 				.number()
 				.int()
+				.positive()
 				.optional()
-				.describe("最大执行次数（可选，不设置则无限重复；at 模式默认为1）"),
+				.describe("最大执行次数（必须 ≥1；不设置则无限重复，at 模式默认为1）"),
 			targetChannelType: z.string().optional().describe("渠道类型，如 feishu:main, wecom"),
 			targetChannelId: z
 				.string()
@@ -260,12 +261,13 @@ function createEditTool(scheduler: SchedulerService, contextInfo: string) {
 			timezone: z.string().optional().describe("新的时区"),
 			targetChannelType: z.string().optional().describe("渠道类型，如 feishu:main, wecom"),
 			targetChannelId: z.string().optional().describe("新的目标渠道ID（不填则不修改）"),
-			maxExecutions: z
+			maxExecutions: z.coerce
 				.number()
 				.int()
+				.positive()
 				.nullable()
 				.optional()
-				.describe("新的最大执行次数（null 表示取消上限）"),
+				.describe("新的最大执行次数（必须 ≥1；取消上限请传 null，不要传 0）"),
 		}),
 		execute: async (input) => {
 			logger.debug("[tool:schedule] edit_schedule called", input);
