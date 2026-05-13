@@ -65,9 +65,10 @@ export function resolveThinkingOptions(
 			if (effort === "off") {
 				return { providerOptions: { deepseek: { thinking: { type: "disabled" } } } };
 			}
-			if (effort === "auto") {
-				return { providerOptions: { deepseek: { thinking: { type: "adaptive" } } } };
-			}
+			// `auto` returns {} so the server's default (deepseek-v4-pro on, -flash off)
+			// applies. The SDK type accepts "adaptive", but neither DeepSeek's API docs
+			// nor the AI SDK provider docs list it, so we don't send it.
+			if (effort === "auto") return {};
 			// "minimal" → "low" degradation; everything else passes through. We forward
 			// the full enum even though DeepSeek's server may coerce granularity, so
 			// cross-provider configs stay uniform.
