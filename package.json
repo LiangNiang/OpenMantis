@@ -28,7 +28,7 @@
 		"@openmantis/core": "workspace:*",
 		"@openmantis/scheduler": "workspace:*",
 		"@openmantis/web-server": "workspace:*",
-		"ai": "^6.0.138"
+		"ai": "^6.0.180"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.4.9",

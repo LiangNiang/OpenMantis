@@ -15,9 +15,9 @@
 		"@openmantis/common": "workspace:*",
 		"@openmantis/core": "workspace:*",
 		"@openmantis/scheduler": "workspace:*",
+		"ai": "^6.0.180",
 		"hono": "^4.12.10",
-		"zod": "^4.3.6",
-		"ai": "^6.0.138"
+		"zod": "^4.3.6"
 	},
 	"devDependencies": {
 		"@types/bun": "latest"

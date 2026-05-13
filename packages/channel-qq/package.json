@@ -7,7 +7,7 @@
 	},
 	"dependencies": {
 		"@openmantis/common": "workspace:*",
-		"ai": "^6.0.138",
+		"ai": "^6.0.180",
 		"zod": "^4.3.6"
 	},
 	"devDependencies": {

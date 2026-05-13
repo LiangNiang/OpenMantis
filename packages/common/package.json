@@ -21,7 +21,7 @@
 		"./config/merge": "./src/config/merge.ts"
 	},
 	"dependencies": {
-		"ai": "^6.0.138",
+		"ai": "^6.0.180",
 		"consola": "^3.4.2",
 		"zod": "^4.3.6"
 	},
