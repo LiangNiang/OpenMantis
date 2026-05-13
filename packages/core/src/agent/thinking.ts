@@ -68,8 +68,9 @@ export function resolveThinkingOptions(
 			if (effort === "auto") {
 				return { providerOptions: { deepseek: { thinking: { type: "adaptive" } } } };
 			}
-			// "minimal" → "low" 降级；其余直通。DeepSeek 服务端会把 low/medium 都视为 high、
-			// xhigh 视为 max，但 SDK 接受完整枚举以便跨 provider 配置统一。
+			// "minimal" → "low" degradation; everything else passes through. We forward
+			// the full enum even though DeepSeek's server may coerce granularity, so
+			// cross-provider configs stay uniform.
 			const mapped = effort === "minimal" ? "low" : effort;
 			return {
 				providerOptions: {
