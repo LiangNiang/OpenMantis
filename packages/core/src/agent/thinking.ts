@@ -61,6 +61,23 @@ export function resolveThinkingOptions(
 			return { providerOptions: { "xiaomi-mimo": { thinking: { type: "enabled" } } } };
 		}
 
+		case "deepseek": {
+			if (effort === "off") {
+				return { providerOptions: { deepseek: { thinking: { type: "disabled" } } } };
+			}
+			if (effort === "auto") {
+				return { providerOptions: { deepseek: { thinking: { type: "adaptive" } } } };
+			}
+			// "minimal" → "low" 降级；其余直通。DeepSeek 服务端会把 low/medium 都视为 high、
+			// xhigh 视为 max，但 SDK 接受完整枚举以便跨 provider 配置统一。
+			const mapped = effort === "minimal" ? "low" : effort;
+			return {
+				providerOptions: {
+					deepseek: { thinking: { type: "enabled" }, reasoningEffort: mapped },
+				},
+			};
+		}
+
 		default:
 			return {};
 	}
