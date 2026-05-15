@@ -8,16 +8,12 @@ export interface ChannelsValues {
 		name: string;
 		appId: string;
 		appSecret: string;
-		provider?: string;
-		tts?: { enabled: boolean; provider: "xiaomi-mimo" };
 	}>;
 	wecom?: {
 		botId: string;
 		secret: string;
-		provider?: string;
-		tts?: { enabled: boolean; provider: "xiaomi-mimo" };
 	};
-	qq?: { appId: string; clientSecret: string; sandbox: boolean; provider?: string };
+	qq?: { appId: string; clientSecret: string; sandbox: boolean };
 }
 
 export interface ProviderValues {
@@ -44,7 +40,6 @@ export interface DashboardOutletContext {
 	setToolsValues: React.Dispatch<React.SetStateAction<ToolsFormValues>>;
 	advancedValues: AdvancedValues;
 	setAdvancedValues: React.Dispatch<React.SetStateAction<AdvancedValues>>;
-	providerNames: string[];
 }
 
 export function useDashboardContext(): DashboardOutletContext {

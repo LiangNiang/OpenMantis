@@ -4,28 +4,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-
-interface ChannelTts {
-	enabled: boolean;
-	provider: "xiaomi-mimo";
-}
 
 interface ChannelsFormProps {
 	values: {
 		channels: string[];
-		feishu?: Array<{ name: string; appId: string; appSecret: string; provider?: string; tts?: ChannelTts }>;
-		wecom?: { botId: string; secret: string; provider?: string; tts?: ChannelTts };
-		qq?: { appId: string; clientSecret: string; sandbox: boolean; provider?: string };
+		feishu?: Array<{ name: string; appId: string; appSecret: string }>;
+		wecom?: { botId: string; secret: string };
+		qq?: { appId: string; clientSecret: string; sandbox: boolean };
 	};
 	onChange: (values: ChannelsFormProps["values"]) => void;
-	providerNames?: string[];
 }
 
-const EMPTY_PROVIDER_NAMES: string[] = [];
-
-export function ChannelsForm({ values, onChange, providerNames = EMPTY_PROVIDER_NAMES }: ChannelsFormProps) {
+export function ChannelsForm({ values, onChange }: ChannelsFormProps) {
 	const { t } = useLocale();
 	const toggleChannel = (channel: string, enabled: boolean) => {
 		const next = { ...values };
@@ -43,13 +34,6 @@ export function ChannelsForm({ values, onChange, providerNames = EMPTY_PROVIDER_
 	const updateFeishuApp = (index: number, key: string, value: string) => {
 		const apps = [...(values.feishu ?? [])];
 		apps[index] = { ...apps[index], [key]: value };
-		onChange({ ...values, feishu: apps });
-	};
-
-	const updateFeishuAppTts = (index: number, key: keyof ChannelTts, value: boolean | string) => {
-		const apps = [...(values.feishu ?? [])];
-		const tts: ChannelTts = { enabled: false, provider: "xiaomi-mimo", ...(apps[index].tts ?? {}), [key]: value };
-		apps[index] = { ...apps[index], tts };
 		onChange({ ...values, feishu: apps });
 	};
 
@@ -72,42 +56,11 @@ export function ChannelsForm({ values, onChange, providerNames = EMPTY_PROVIDER_
 		onChange({ ...values, wecom: { ...values.wecom!, [key]: value } });
 	};
 
-	const updateWecomTts = (key: keyof ChannelTts, value: boolean | string) => {
-		const tts: ChannelTts = { enabled: false, provider: "xiaomi-mimo", ...(values.wecom?.tts ?? {}), [key]: value };
-		onChange({ ...values, wecom: { ...values.wecom!, tts } });
-	};
-
 	const updateQQ = (key: string, value: string | boolean) => {
 		onChange({ ...values, qq: { ...values.qq!, [key]: value } });
 	};
 
 	const isEnabled = (ch: string) => values.channels.includes(ch);
-
-	const providerSelect = (
-		currentValue: string | undefined,
-		onUpdate: (key: string, value: any) => void,
-	) =>
-		providerNames.length > 0 ? (
-			<div className="flex flex-col gap-2">
-				<Label>{t("channels.provider")}</Label>
-				<Select
-					value={currentValue ?? "__default__"}
-					onValueChange={(v) => onUpdate("provider", v === "__default__" ? undefined : v)}
-				>
-					<SelectTrigger>
-						<SelectValue />
-					</SelectTrigger>
-					<SelectContent>
-						<SelectItem value="__default__">{t("channels.useDefaultProvider")}</SelectItem>
-						{providerNames.map((name) => (
-							<SelectItem key={name} value={name}>
-								{name}
-							</SelectItem>
-						))}
-					</SelectContent>
-				</Select>
-			</div>
-		) : null;
 
 	return (
 		<div className="flex flex-col gap-4">
@@ -168,36 +121,6 @@ export function ChannelsForm({ values, onChange, providerNames = EMPTY_PROVIDER_
 										onChange={(v) => updateFeishuApp(index, "appSecret", v)}
 									/>
 								</div>
-								{providerSelect(app.provider, (key, value) => updateFeishuApp(index, key, value))}
-								<div className="flex flex-col gap-3 pt-1">
-									<p className="text-sm font-medium">{t("feishu.tts.title")}</p>
-									<div className="flex items-center justify-between">
-										<div>
-											<Label className="font-normal">{t("feishu.tts.enabled.label")}</Label>
-											<p className="text-xs text-muted-foreground">{t("feishu.tts.enabled.helper")}</p>
-										</div>
-										<Switch
-											checked={app.tts?.enabled ?? false}
-											onCheckedChange={(v) => updateFeishuAppTts(index, "enabled", v)}
-										/>
-									</div>
-									{(app.tts?.enabled ?? false) && (
-										<div className="flex flex-col gap-2">
-											<Label>{t("feishu.tts.provider.label")}</Label>
-											<Select
-												value={app.tts?.provider ?? "xiaomi-mimo"}
-												onValueChange={(v) => updateFeishuAppTts(index, "provider", v)}
-											>
-												<SelectTrigger>
-													<SelectValue />
-												</SelectTrigger>
-												<SelectContent>
-													<SelectItem value="xiaomi-mimo">Xiaomi MiMo TTS</SelectItem>
-												</SelectContent>
-											</Select>
-										</div>
-									)}
-								</div>
 							</div>
 						))}
 						<Button
@@ -238,36 +161,6 @@ export function ChannelsForm({ values, onChange, providerNames = EMPTY_PROVIDER_
 								onChange={(v) => updateWecom("secret", v)}
 							/>
 						</div>
-						{providerSelect(values.wecom.provider, updateWecom)}
-						<div className="flex flex-col gap-3 pt-1">
-							<p className="text-sm font-medium">{t("wecom.tts.title")}</p>
-							<div className="flex items-center justify-between">
-								<div>
-									<Label className="font-normal">{t("wecom.tts.enabled.label")}</Label>
-									<p className="text-xs text-muted-foreground">{t("wecom.tts.enabled.helper")}</p>
-								</div>
-								<Switch
-									checked={values.wecom.tts?.enabled ?? false}
-									onCheckedChange={(v) => updateWecomTts("enabled", v)}
-								/>
-							</div>
-							{(values.wecom.tts?.enabled ?? false) && (
-								<div className="flex flex-col gap-2">
-									<Label>{t("wecom.tts.provider.label")}</Label>
-									<Select
-										value={values.wecom.tts?.provider ?? "xiaomi-mimo"}
-										onValueChange={(v) => updateWecomTts("provider", v)}
-									>
-										<SelectTrigger>
-											<SelectValue />
-										</SelectTrigger>
-										<SelectContent>
-											<SelectItem value="xiaomi-mimo">Xiaomi MiMo TTS</SelectItem>
-										</SelectContent>
-									</Select>
-								</div>
-							)}
-						</div>
 					</CardContent>
 				)}
 			</Card>
@@ -296,7 +189,6 @@ export function ChannelsForm({ values, onChange, providerNames = EMPTY_PROVIDER_
 							<Switch checked={values.qq.sandbox} onCheckedChange={(v) => updateQQ("sandbox", v)} />
 							<Label>{t("channels.sandbox")}</Label>
 						</div>
-						{providerSelect(values.qq.provider, updateQQ)}
 					</CardContent>
 				)}
 			</Card>

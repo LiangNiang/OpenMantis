@@ -3,13 +3,8 @@ import { createLogger } from "@openmantis/common/logger";
 
 const logger = createLogger("core/gateway");
 
-interface ChannelBinding {
-	routeId: string;
-	provider?: string;
-}
-
 export class ChannelBindings {
-	private bindings: Record<string, Record<string, ChannelBinding>> = {};
+	private bindings: Record<string, Record<string, string>> = {};
 	private filePath: string;
 
 	constructor(filePath: string) {
@@ -21,14 +16,14 @@ export class ChannelBindings {
 			const file = Bun.file(this.filePath);
 			if (await file.exists()) {
 				const raw = await file.json();
-				// Migrate old format: string values → ChannelBinding objects
 				for (const channelType of Object.keys(raw)) {
 					if (!this.bindings[channelType]) this.bindings[channelType] = {};
 					for (const [chatId, value] of Object.entries(raw[channelType])) {
+						// Tolerate legacy `{ routeId, provider? }` objects on disk
 						if (typeof value === "string") {
-							this.bindings[channelType][chatId] = { routeId: value };
-						} else {
-							this.bindings[channelType][chatId] = value as ChannelBinding;
+							this.bindings[channelType][chatId] = value;
+						} else if (value && typeof value === "object" && "routeId" in value) {
+							this.bindings[channelType][chatId] = (value as { routeId: string }).routeId;
 						}
 					}
 				}
@@ -40,36 +35,14 @@ export class ChannelBindings {
 	}
 
 	get(channelType: string, chatId: string): string | undefined {
-		return this.bindings[channelType]?.[chatId]?.routeId;
-	}
-
-	getBinding(channelType: string, chatId: string): ChannelBinding | undefined {
 		return this.bindings[channelType]?.[chatId];
-	}
-
-	getProvider(channelType: string, chatId: string): string | undefined {
-		return this.bindings[channelType]?.[chatId]?.provider;
 	}
 
 	async set(channelType: string, chatId: string, routeId: string): Promise<void> {
 		if (!this.bindings[channelType]) {
 			this.bindings[channelType] = {};
 		}
-		const existing = this.bindings[channelType][chatId];
-		this.bindings[channelType][chatId] = { ...existing, routeId };
-		await this.persist();
-	}
-
-	async setProvider(channelType: string, chatId: string, provider: string): Promise<void> {
-		if (!this.bindings[channelType]) {
-			this.bindings[channelType] = {};
-		}
-		const existing = this.bindings[channelType][chatId];
-		if (existing) {
-			existing.provider = provider;
-		} else {
-			this.bindings[channelType][chatId] = { routeId: "", provider };
-		}
+		this.bindings[channelType][chatId] = routeId;
 		await this.persist();
 	}
 
@@ -85,8 +58,8 @@ export class ChannelBindings {
 		for (const channelType of Object.keys(this.bindings)) {
 			const channelBindings = this.bindings[channelType];
 			if (!channelBindings) continue;
-			for (const [chatId, binding] of Object.entries(channelBindings)) {
-				if (binding.routeId === routeId) {
+			for (const [chatId, boundRouteId] of Object.entries(channelBindings)) {
+				if (boundRouteId === routeId) {
 					delete channelBindings[chatId];
 					changed = true;
 				}

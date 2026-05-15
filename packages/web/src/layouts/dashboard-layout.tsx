@@ -263,10 +263,6 @@ whisper: config.whisper,
 	}, [activeSection, resetConfig]);
 
 	const currentSection = sections.find((s) => s.id === activeSection)!;
-	const providerNames = useMemo(
-		() => providerValues.providers.map((p) => p.name),
-		[providerValues.providers],
-	);
 
 	const outletContext: DashboardOutletContext = useMemo(
 		() => ({
@@ -278,9 +274,8 @@ whisper: config.whisper,
 			setToolsValues,
 			advancedValues,
 			setAdvancedValues,
-			providerNames,
 		}),
-		[providerValues, channelsValues, toolsValues, advancedValues, providerNames],
+		[providerValues, channelsValues, toolsValues, advancedValues],
 	);
 
 	return (

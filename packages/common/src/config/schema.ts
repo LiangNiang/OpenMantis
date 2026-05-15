@@ -1,30 +1,20 @@
 import { z } from "zod";
 
-const channelTtsSchema = z.object({
-	enabled: z.boolean().default(false),
-	provider: z.enum(["xiaomi-mimo"]).default("xiaomi-mimo"),
-});
-
 const feishuConfigSchema = z.object({
 	name: z.string().regex(/^[a-z0-9-]+$/, "name must be lowercase alphanumeric with hyphens"),
 	appId: z.string(),
 	appSecret: z.string(),
-	provider: z.string().optional(),
-	tts: channelTtsSchema.optional(),
 });
 
 const wecomConfigSchema = z.object({
 	botId: z.string(),
 	secret: z.string(),
-	provider: z.string().optional(),
-	tts: channelTtsSchema.optional(),
 });
 
 const qqConfigSchema = z.object({
 	appId: z.string(),
 	clientSecret: z.string(),
 	sandbox: z.boolean().default(false),
-	provider: z.string().optional(),
 });
 
 const tavilyConfigSchema = z.object({
@@ -50,6 +40,7 @@ const whisperConfigSchema = z.object({
 
 const xiaomiTtsConfigSchema = z.object({
 	enabled: z.boolean().default(false),
+	autoSpeak: z.boolean().default(false),
 	apiKey: z.string().optional(),
 	baseUrl: z.string().optional(),
 	voice: z.string().default("mimo_default"),

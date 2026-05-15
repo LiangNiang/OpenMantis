@@ -39,9 +39,9 @@ export function Wizard({ onComplete, onCancel }: WizardProps) {
 
 	const [channelsValues, setChannelsValues] = useState<{
 		channels: string[];
-		feishu?: Array<{ name: string; appId: string; appSecret: string; provider?: string }>;
-		wecom?: { botId: string; secret: string; provider?: string };
-		qq?: { appId: string; clientSecret: string; sandbox: boolean; provider?: string };
+		feishu?: Array<{ name: string; appId: string; appSecret: string }>;
+		wecom?: { botId: string; secret: string };
+		qq?: { appId: string; clientSecret: string; sandbox: boolean };
 	}>({ channels: [] });
 
 	const [toolsValues, setToolsValues] = useState<ToolsFormValues>({
@@ -81,7 +81,6 @@ export function Wizard({ onComplete, onCancel }: WizardProps) {
 	};
 
 	const isLastStep = step === STEP_KEYS.length - 1;
-	const providerNames = providerValues.providers.map((p) => p.name);
 
 	return (
 		<div className="min-h-screen bg-background text-foreground flex flex-col items-center py-16 px-4 relative noise">
@@ -169,11 +168,7 @@ export function Wizard({ onComplete, onCancel }: WizardProps) {
 					<CardContent className="pt-6">
 						{step === 0 && <ProviderForm values={providerValues} onChange={setProviderValues} />}
 						{step === 1 && (
-							<ChannelsForm
-								values={channelsValues}
-								onChange={setChannelsValues}
-								providerNames={providerNames}
-							/>
+							<ChannelsForm values={channelsValues} onChange={setChannelsValues} />
 						)}
 						{step === 2 && <ToolsForm values={toolsValues} onChange={setToolsValues} />}
 						{step === 3 && <AdvancedForm values={advancedValues} onChange={setAdvancedValues} />}

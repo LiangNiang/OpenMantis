@@ -18,6 +18,7 @@ export interface ToolsFormValues {
 whisper?: { apiKey?: string; baseUrl?: string };
 	xiaomiTts?: {
 		enabled: boolean;
+		autoSpeak: boolean;
 		apiKey?: string;
 		baseUrl?: string;
 		voice: string;
@@ -47,6 +48,7 @@ const TOOL_GROUPS = [
 
 const DEFAULT_XIAOMI_TTS = {
 	enabled: false,
+	autoSpeak: false,
 	voice: "mimo_default",
 	style: "",
 	direction: "",
@@ -267,6 +269,16 @@ export function ToolsForm({ values, onChange }: ToolsFormProps) {
 								placeholder={t("xiaomiTts.direction.placeholder")}
 								onChange={(e) => updateXiaomiTts("direction", e.target.value)}
 								rows={3}
+							/>
+						</div>
+						<div className="flex items-center justify-between">
+							<div>
+								<Label>{t("xiaomiTts.autoSpeak.label")}</Label>
+								<p className="text-sm text-muted-foreground">{t("xiaomiTts.autoSpeak.helper")}</p>
+							</div>
+							<Switch
+								checked={values.xiaomiTts?.autoSpeak ?? false}
+								onCheckedChange={(v) => updateXiaomiTts("autoSpeak", v)}
 							/>
 						</div>
 						<div className="flex items-center justify-between">

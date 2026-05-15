@@ -120,39 +120,24 @@ async function maybeRunAutoTts(params: {
 }): Promise<void> {
 	const { route, channel, finalText, config } = params;
 
-	// 1. Resolve channel-side TTS config
-	const channelTts = channel.channelType.startsWith("feishu")
-		? config.feishu?.find((app) => `feishu:${app.name}` === channel.channelType)?.tts
-		: channel.channelType === "wecom"
-			? config.wecom?.tts
-			: undefined;
-
-	if (!channelTts) {
-		logger.debug(`[gateway] auto-tts skip: channel ${channel.channelType} has no tts config`);
-		return;
-	}
-
-	// 2. enabled gate (route override wins)
-	const effectiveEnabled = route.voiceMode ?? channelTts.enabled;
+	// enabled gate (route override wins over global autoSpeak)
+	const effectiveEnabled = route.voiceMode ?? config.xiaomiTts?.autoSpeak ?? false;
 	if (!effectiveEnabled) {
 		logger.debug(`[gateway] auto-tts skip: voiceMode disabled for ${channel.channelType}`);
 		return;
 	}
 
-	// 3. provider lookup
-	const provider = getTtsProvider(channelTts.provider);
+	const provider = getTtsProvider("xiaomi-mimo");
 	if (!provider) {
-		logger.warn(`[gateway] auto-tts skip: unknown provider ${channelTts.provider}`);
+		logger.warn("[gateway] auto-tts skip: xiaomi-mimo provider not registered");
 		return;
 	}
 
-	// 4. provider configured?
 	if (!provider.isConfigured(config)) {
 		logger.warn(`[gateway] auto-tts skip: provider ${provider.name} not configured`);
 		return;
 	}
 
-	// 5. text checks
 	const text = finalText.trim();
 	if (!text) return;
 	if (text.length > 2000) {
@@ -160,7 +145,6 @@ async function maybeRunAutoTts(params: {
 		return;
 	}
 
-	// 6. synthesize + upload (style / direction resolved inside provider via config fallback)
 	try {
 		const useStream = config.xiaomiTts?.stream ?? true;
 		logger.info(
@@ -388,24 +372,8 @@ export class Gateway {
 
 		await this.routeStore.save(route);
 
-		// Resolve provider: route > channel binding > channel config > default
-		const bindingsProvider = this.channelBindings?.getProvider(
-			incoming.channelType,
-			bindingChatId(incoming.channelType, incoming.channelId),
-		);
-		const channelConfigProvider = (() => {
-			const channelConf = this.config[incoming.channelType as keyof OpenMantisConfig];
-			if (channelConf && typeof channelConf === "object" && !Array.isArray(channelConf)) {
-				return (channelConf as { provider?: string }).provider;
-			}
-			if (Array.isArray(channelConf)) {
-				// feishu is an array — provider comes from the matching entry, resolved elsewhere
-				return undefined;
-			}
-			return undefined;
-		})();
-		const resolvedProvider =
-			route.provider ?? bindingsProvider ?? channelConfigProvider ?? this.config.defaultProvider;
+		// Resolve provider: route override > default
+		const resolvedProvider = route.provider ?? this.config.defaultProvider;
 		logger.debug(`[gateway] provider=${resolvedProvider}`);
 
 		// Build agent messages: use multi-modal content if files present
