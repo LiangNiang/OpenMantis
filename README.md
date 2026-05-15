@@ -2,7 +2,7 @@
 
 [中文](README.md) | [English](README.en.md)
 
-**基于 Bun + Vercel AI SDK 构建的轻量级多平台 Agent 聊天框架。**
+**基于 Bun + Vercel AI SDK 构建的个人 Agent 聊天框架——一次部署，自己用。**
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square)](LICENSE)
 [![Bun](https://img.shields.io/badge/runtime-Bun-f9f1e1?style=flat-square&logo=bun)](https://bun.sh)
@@ -16,6 +16,9 @@
 
 将多个 LLM 供应商连接到多个通讯平台，配合可组合的工具、定时任务、浏览器自动化、记忆系统、定时任务等能力 —— 一次部署，全部搞定。
 
+> [!NOTE]
+> OpenMantis 是为**个人单用户**使用而设计的：假设只有一位用户（项目所有者本人）通过飞书/企业微信/QQ 等渠道与 Agent 对话。因此**不内置多租户、用户隔离或权限管理**，记忆、路由、调度等均不按用户区分。
+
 ---
 
 ## 特性
@@ -28,7 +31,7 @@
 - **浏览器自动化** — 内置 `browser` 工具组通过 [agent-browser](https://github.com/vercel-labs/agent-browser) 驱动真实浏览器，支持每会话隔离配置文件、CDP 模式复用本地 Chrome，以及 CDP 不可达时自动回退到隔离模式。
 - **Web 管理面板** — 首次运行自动启动配置向导，支持中英文和供应商连接测试。
 - **深度思考** — OpenAI 推理强度控制，Anthropic 自适应思考。
-- **长期记忆** — 基于认知科学的四类型记忆模型（语义 / 程序 / 情景 / 前瞻），按 global / channel 双作用域组织。每条记忆是带 frontmatter 的独立 Markdown 文件，每作用域一个 `MEMORY.md` 索引始终注入系统提示词；LLM 驱动的冲突检测避免重复写入。
+- **长期记忆** — 基于认知科学的四类型记忆模型（语义 / 程序 / 情景 / 前瞻）。每条记忆是带 frontmatter 的独立 Markdown 文件，统一存放并由单一 `MEMORY.md` 索引始终注入系统提示词；LLM 驱动的冲突检测避免重复写入。
 - **会话管理** — 持久化消息路由，包含消息历史和通道-消息路由绑定。
 - **自动续接 + Recap** — 路由空闲超过阈值时自动开启新会话，旧会话异步生成结构化摘要（目标 / 决策 / 改动 / 待办）归档到 `route.recaps[]`，并向频道推送一条简洁通知；也可手动 `/recap`。
 
@@ -161,7 +164,7 @@ LLM 供应商优先级：消息路由覆盖 > 通道绑定 > 通道配置 > 全�
 | `rss` | `rssFetch`, `rssDiscover` | 解析 RSS/Atom 订阅源，从网站发现订阅源 URL |
 | `whisper` | `audio_transcribe` | 音频/视频文件转文字，支持 SRT 字幕和时间戳 |
 | `tts` | `tts_speak` | 基于小米 TTS 的文字转语音合成，支持风格和表情控制 |
-| `memory` | `save_memory`, `forget_memory`, `update_memory`, `load_route_context` | 长期记忆跨 global/channel 双作用域，四类型（semantic/procedural/episodic/prospective），按需读取索引指向的单文件；历史会话通过 routeId 加载 |
+| `memory` | `save_memory`, `forget_memory`, `update_memory`, `load_route_context` | 长期记忆四类型（semantic/procedural/episodic/prospective），统一存放并按需读取索引指向的单文件；历史会话通过 routeId 加载 |
 | `message` | `send_message` | 向指定通道发送消息（网关上下文可用时自动注入） |
 
 通道特定工具（飞书文件上传、文档创建等）会根据当前通道自动注入。
@@ -196,10 +199,9 @@ LLM 供应商优先级：消息路由覆盖 > 通道绑定 > 通道配置 > 全�
 | `/schedule <list\|delete\|pause\|resume>` | 管理定时任务 |
 | `/voice [on\|off]` | 切换 TTS 语音模式（仅飞书/企业微信） |
 | `/remember <content>` | 提示 agent 在下一轮调用 `save_memory` 保存（v2 起命令层不再裸写，由 agent 判断 type/subject） |
-| `/forget <keyword>` | 按关键词模糊匹配（global + 当前 channel），命中后删除文件并同步移除 `MEMORY.md` 索引 |
-| `/memories` | 显示 `MEMORY.md` 索引（global + 当前 channel 两块） |
+| `/forget <keyword>` | 按关键词模糊匹配记忆，命中后删除文件并同步移除 `MEMORY.md` 索引 |
+| `/memories` | 显示 `MEMORY.md` 索引 |
 | `/bot-open-id` | 显示机器人 open_id（仅飞书） |
-| `/open-id` | 显示你的飞书 open_id |
 
 ## 浏览器自动化
 
@@ -247,7 +249,7 @@ google-chrome --remote-debugging-port=9222
 
 ## 记忆系统
 
-基于人类认知科学的四类型模型，按 global / channel 双作用域组织。每条记忆是一个带 frontmatter 的独立 Markdown 文件，每作用域一个 `MEMORY.md` 索引始终注入系统提示词，单条文件由 Agent 按需 Read。
+基于人类认知科学的四类型模型。每条记忆是一个带 frontmatter 的独立 Markdown 文件，统一存放在 `~/.openmantis/memories/<type>/` 下，根目录的 `MEMORY.md` 索引始终注入系统提示词，单条文件由 Agent 按需 Read。
 
 ![记忆系统](assets/memory.zh.svg)
 

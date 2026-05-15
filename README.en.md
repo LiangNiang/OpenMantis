@@ -2,7 +2,7 @@
 
 [中文](README.md) | [English](README.en.md)
 
-**A minimal multi-platform agentic chat framework built with Bun + Vercel AI SDK.**
+**A personal multi-channel agentic chat framework built with Bun + Vercel AI SDK — deploy once, run for yourself.**
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square)](LICENSE)
 [![Bun](https://img.shields.io/badge/runtime-Bun-f9f1e1?style=flat-square&logo=bun)](https://bun.sh)
@@ -16,6 +16,9 @@
 
 Connect multiple LLM providers to multiple communication channels with composable tools, scheduling, browser automation, and more — all from a single deployment.
 
+> [!NOTE]
+> OpenMantis is designed for **personal, single-user** use: it assumes one person (the project owner) talks to the agent through Feishu / WeCom / QQ. It deliberately ships **without** multi-tenant, user-isolation, or permission features — memory, routes, and schedules are not partitioned by user.
+
 ---
 
 ## Features
@@ -28,7 +31,7 @@ Connect multiple LLM providers to multiple communication channels with composabl
 - **Browser Automation** — Built-in `browser` tool group drives a real browser via [agent-browser](https://github.com/vercel-labs/agent-browser), with CDP mode for reusing your local Chrome.
 - **Web Dashboard** — First-run setup wizard and config management UI with i18n (English/Chinese) and provider connection testing.
 - **Extended Thinking** — Reasoning effort control for OpenAI and adaptive thinking for Anthropic models.
-- **Long-Term Memory** — Cognitive-memory-inspired model with four types (semantic / procedural / episodic / prospective) split across global and per-channel scopes. Each entry is a single Markdown file with frontmatter; a per-scope `MEMORY.md` index is always loaded into the system prompt. LLM-based duplicate detection prevents redundant writes.
+- **Long-Term Memory** — Cognitive-memory-inspired model with four types (semantic / procedural / episodic / prospective). Each entry is a single Markdown file with frontmatter; a single `MEMORY.md` index is always loaded into the system prompt. LLM-based duplicate detection prevents redundant writes.
 - **Session Management** — Persistent message routes with message history and channel-to-message-route bindings.
 - **Auto-New Route + Recap** — When a route goes idle past a threshold, the next message starts a fresh route automatically and the old route is asynchronously summarized into a structured recap (goal / decisions / changes / todos), archived into `route.recaps[]`, and announced to the chat. Manual `/recap` is also available.
 
@@ -105,7 +108,7 @@ openmantis init        # Extract built-in skills (--force to overwrite)
 
 ![Architecture](assets/architecture.en.svg)
 
-Messages flow from a channel adapter into the **Gateway**, which manages sessions (message routes) and creates agents. The **AgentFactory** assembles the LLM provider, tools, and system prompt (including the `MEMORY.md` indices) for each turn, then delegates to a **ToolLoopAgent** for streaming execution. The **Scheduler** can also trigger the full agent pipeline on cron / interval / at schedules.
+Messages flow from a channel adapter into the **Gateway**, which manages sessions (message routes) and creates agents. The **AgentFactory** assembles the LLM provider, tools, and system prompt (including the `MEMORY.md` index) for each turn, then delegates to a **ToolLoopAgent** for streaming execution. The **Scheduler** can also trigger the full agent pipeline on cron / interval / at schedules.
 
 ## Project Structure
 
@@ -161,7 +164,7 @@ Tools are organized into groups and can be toggled via the `excludeTools` config
 | `rss` | `rssFetch`, `rssDiscover` | Parse RSS/Atom feeds and discover feed URLs from websites |
 | `whisper` | `audio_transcribe` | Transcribe audio/video files to text with SRT subtitles and timestamps |
 | `tts` | `tts_speak` | Text-to-speech synthesis via Xiaomi TTS with style/expression support |
-| `memory` | `save_memory`, `forget_memory`, `update_memory`, `load_route_context` | Long-term memory across global / channel scopes with four types (semantic/procedural/episodic/prospective); on-demand reads of single-file entries via the index. Past sessions loaded by routeId. |
+| `memory` | `save_memory`, `forget_memory`, `update_memory`, `load_route_context` | Long-term memory with four types (semantic/procedural/episodic/prospective), stored in a single flat tree and read on demand via the index. Past sessions loaded by routeId. |
 | `message` | `send_message` | Send messages to specified channels (always injected when gateway context available) |
 
 Channel-specific tools (Feishu file uploads, doc creation, etc.) are injected automatically based on the active channel.
@@ -196,10 +199,9 @@ Users interact with the agent via `/` commands in chat:
 | `/schedule <list\|delete\|pause\|resume>` | Manage scheduled tasks |
 | `/voice [on\|off]` | Toggle TTS voice mode (Feishu/WeCom only) |
 | `/remember <content>` | Hint to the agent to call `save_memory` next turn (v2 no longer writes directly from the command — the agent decides type/subject) |
-| `/forget <keyword>` | Fuzzy-match name/description across global + current channel; deletes the file and removes the entry from `MEMORY.md` |
-| `/memories` | Show the `MEMORY.md` indices (global + current channel) |
+| `/forget <keyword>` | Fuzzy-match name/description against memory; deletes the file and removes the entry from `MEMORY.md` |
+| `/memories` | Show the `MEMORY.md` index |
 | `/bot-open-id` | Show bot open_id (Feishu only) |
-| `/open-id` | Show your Feishu open_id |
 
 ## Browser Automation
 
@@ -247,7 +249,7 @@ Tasks execute through the full agent pipeline and results are delivered to the o
 
 ## Memory System
 
-A cognitive-memory-inspired model with four types, organized across **global** and per-**channel** scopes. Each entry is a single Markdown file with frontmatter; a per-scope `MEMORY.md` index is always injected into the system prompt, and individual files are read on demand by the agent.
+A cognitive-memory-inspired model with four types. Each entry is a single Markdown file with frontmatter, stored under `~/.openmantis/memories/<type>/`. The root `MEMORY.md` index is always injected into the system prompt, and individual files are read on demand by the agent.
 
 ![Memory System](assets/memory.en.svg)
 
