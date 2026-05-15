@@ -10,24 +10,15 @@ import { detectConflictV2 } from "./conflict-v2";
 import { formatDate, normalizeRelativeDates } from "./date-normalize";
 import { deleteMemoryFile, patchMemory, writeMemory } from "./file-store";
 import { appendIndex, findIndexEntries, removeFromIndex, updateIndexEntry } from "./index-store";
-import {
-	MEMORY_SCOPES,
-	MEMORY_SUBJECTS,
-	MEMORY_TYPES,
-	type MemoryFrontmatter,
-	type MemoryScope,
-	type MemoryType,
-} from "./types";
+import { MEMORY_SUBJECTS, MEMORY_TYPES, type MemoryFrontmatter, type MemoryType } from "./types";
 
 const logger = createLogger("core/tools");
 
 export const MEMORY_TOOL_GUIDE = `## Memory System
 
-You have a long-term memory split across two scopes:
-- **Global Memory** — facts that hold across all channels (user identity, persistent preferences for the agent's behavior).
-- **Channel Memory** — facts specific to the current channel (this channel's persona, channel-specific people, ongoing topics).
+You have a long-term memory of facts about the user, the agent's own behavior, the world, and external references.
 
-Each scope has a \`MEMORY.md\` index already loaded into your system prompt. Each entry in the index points to a single .md file you can Read with the file tool when you need full content.
+A \`MEMORY.md\` index is already loaded into your system prompt. Each entry in the index points to a single .md file you can Read with the file tool when you need full content.
 
 ### Memory types (based on human cognitive memory)
 
@@ -72,10 +63,6 @@ const saveSchema = z.object({
 	subject: z
 		.enum(MEMORY_SUBJECTS)
 		.describe("Whom this memory is about: user / agent / world / reference"),
-	scope: z
-		.enum(MEMORY_SCOPES)
-		.default("channel")
-		.describe("`global` for cross-channel, `channel` for current"),
 	name: z.string().min(1).max(80).describe("Short title; used in MEMORY.md and as filename slug"),
 	description: z
 		.string()
@@ -119,8 +106,8 @@ async function loadRouteMessages(routeId: string): Promise<string> {
 	return JSON.stringify(recent, null, 2);
 }
 
-export function createMemoryTools(ctx: { channelId: string; model?: LanguageModelV3 }) {
-	const { channelId, model } = ctx;
+export function createMemoryTools(ctx: { model?: LanguageModelV3 }) {
+	const { model } = ctx;
 	let saveCount = 0;
 
 	return {
@@ -151,15 +138,10 @@ export function createMemoryTools(ctx: { channelId: string; model?: LanguageMode
 					...(input.deadline ? { deadline: normalizeRelativeDates(input.deadline) } : {}),
 				};
 
-				const scope = input.scope as MemoryScope;
-				const channelArg = scope === "global" ? undefined : channelId;
-
 				if (model) {
 					try {
 						const verdict = await detectConflictV2({
 							model,
-							scope,
-							channelId: channelArg,
 							candidate: { frontmatter, body: normalizedBody },
 						});
 						if (verdict.kind === "duplicate") {
@@ -176,8 +158,6 @@ export function createMemoryTools(ctx: { channelId: string; model?: LanguageMode
 				let written: { filename: string; absolutePath: string; indexPath: string };
 				try {
 					written = await writeMemory({
-						scope,
-						channelId: channelArg,
 						frontmatter,
 						body: normalizedBody,
 					});
@@ -192,8 +172,6 @@ export function createMemoryTools(ctx: { channelId: string; model?: LanguageMode
 				let append: { totalLines: number; softWarn: boolean; hardLimit: boolean };
 				try {
 					append = await appendIndex({
-						scope,
-						channelId: channelArg,
 						entry: {
 							type: frontmatter.type,
 							name: frontmatter.name,
@@ -230,7 +208,7 @@ export function createMemoryTools(ctx: { channelId: string; model?: LanguageMode
 				const warn = append.softWarn
 					? ` (warning: index at ${append.totalLines}/500 lines, consider cleanup)`
 					: "";
-				return `Saved [${frontmatter.type}/${frontmatter.subject}] "${frontmatter.name}" → ${scope}/${written.indexPath}${warn}`;
+				return `Saved [${frontmatter.type}/${frontmatter.subject}] "${frontmatter.name}" → ${written.indexPath}${warn}`;
 			},
 		}),
 
@@ -255,55 +233,23 @@ export function createMemoryTools(ctx: { channelId: string; model?: LanguageMode
 				"Remove a memory by fuzzy keyword match (against name + description). If multiple match, returns candidates and asks for a more specific keyword.",
 			inputSchema: z.object({
 				keyword: z.string().min(1).describe("Fuzzy substring matched against name/description"),
-				scope: z
-					.enum(["global", "channel", "all"] as const)
-					.default("all")
-					.describe("Where to search; default both"),
 			}),
-			async execute({ keyword, scope }): Promise<string> {
-				const scopes: Array<{ scope: MemoryScope; channel?: string }> = [];
-				if (scope === "global" || scope === "all") scopes.push({ scope: "global" });
-				if (scope === "channel" || scope === "all")
-					scopes.push({ scope: "channel", channel: channelId });
-
-				type Hit = {
-					scope: MemoryScope;
-					channel?: string;
-					name: string;
-					description: string;
-					indexPath: string;
-				};
-				const hits: Hit[] = [];
-				for (const s of scopes) {
-					const found = await findIndexEntries({
-						scope: s.scope,
-						channelId: s.channel,
-						keyword,
-					});
-					for (const f of found) {
-						hits.push({
-							scope: s.scope,
-							channel: s.channel,
-							name: f.name,
-							description: f.description,
-							indexPath: f.indexPath,
-						});
-					}
-				}
+			async execute({ keyword }): Promise<string> {
+				const hits = await findIndexEntries({ keyword });
 
 				if (hits.length === 0) return `No memory matched "${keyword}".`;
 				if (hits.length > 1) {
 					const list = hits
-						.map((h, i) => `${i + 1}. [${h.scope}] ${h.name} — ${h.description} (${h.indexPath})`)
+						.map((h, i) => `${i + 1}. ${h.name} — ${h.description} (${h.indexPath})`)
 						.join("\n");
 					return `Multiple matches; refine keyword:\n${list}`;
 				}
 
 				const h = hits[0]!;
 				const [type, filename] = h.indexPath.split("/") as [MemoryType, string];
-				await deleteMemoryFile({ scope: h.scope, channelId: h.channel, type, filename });
-				await removeFromIndex({ scope: h.scope, channelId: h.channel, indexPath: h.indexPath });
-				return `Forgot [${h.scope}] ${h.name}`;
+				await deleteMemoryFile({ type, filename });
+				await removeFromIndex({ indexPath: h.indexPath });
+				return `Forgot ${h.name}`;
 			},
 		}),
 
@@ -311,7 +257,6 @@ export function createMemoryTools(ctx: { channelId: string; model?: LanguageMode
 			description:
 				"Patch an existing memory. Cannot change type / subject / name / created — for those, forget and re-save.",
 			inputSchema: z.object({
-				scope: z.enum(["global", "channel"] as const),
 				type: z.enum(MEMORY_TYPES),
 				filename: z.string().describe("Filename within the type dir, e.g. agent_chinese_reply.md"),
 				description: z.string().optional(),
@@ -322,13 +267,8 @@ export function createMemoryTools(ctx: { channelId: string; model?: LanguageMode
 				deadline: z.string().optional(),
 			}),
 			async execute(input): Promise<string> {
-				const scope = input.scope as MemoryScope;
-				const channelArg = scope === "global" ? undefined : channelId;
-
 				try {
 					const updated = await patchMemory({
-						scope,
-						channelId: channelArg,
 						type: input.type as MemoryType,
 						filename: input.filename,
 						patch: {
@@ -342,16 +282,13 @@ export function createMemoryTools(ctx: { channelId: string; model?: LanguageMode
 					});
 					if (input.description !== undefined) {
 						await updateIndexEntry({
-							scope,
-							channelId: channelArg,
 							indexPath: `${input.type}/${input.filename}`,
 							description: input.description,
 						});
 					}
 					return `Updated [${updated.frontmatter.type}/${updated.frontmatter.subject}] "${updated.frontmatter.name}"`;
 				} catch (err: any) {
-					if (err?.code === "ENOENT")
-						return `Memory not found: ${input.scope}/${input.type}/${input.filename}`;
+					if (err?.code === "ENOENT") return `Memory not found: ${input.type}/${input.filename}`;
 					logger.error("[update_memory] failed:", err);
 					return `update failed: ${err?.message ?? "unknown"}`;
 				}

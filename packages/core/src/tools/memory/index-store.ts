@@ -2,29 +2,24 @@
 
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { ensureDir, memoriesScopeDir } from "@openmantis/common/paths";
+import { ensureDir, MEMORIES_DIR } from "@openmantis/common/paths";
 import {
 	MEMORY_INDEX_HARD_LIMIT,
 	MEMORY_INDEX_SOFT_WARN,
 	MEMORY_TYPES,
 	type MemoryIndexEntry,
-	type MemoryScope,
 	type MemoryType,
 } from "./types";
 
 const INDEX_FILENAME = "MEMORY.md";
 
-function indexPath(scope: MemoryScope, channelId?: string): string {
-	const dir = memoriesScopeDir(scope, channelId);
-	return join(dir, INDEX_FILENAME);
+function indexPath(): string {
+	return join(MEMORIES_DIR, INDEX_FILENAME);
 }
 
 /** 读 MEMORY.md，返回结构化 entries 列表。文件不存在返回空。 */
-export async function readIndex(
-	scope: MemoryScope,
-	channelId?: string,
-): Promise<MemoryIndexEntry[]> {
-	const path = indexPath(scope, channelId);
+export async function readIndex(): Promise<MemoryIndexEntry[]> {
+	const path = indexPath();
 	let raw: string;
 	try {
 		raw = await readFile(path, "utf8");
@@ -74,14 +69,9 @@ export function renderIndex(entries: MemoryIndexEntry[]): string {
 }
 
 /** 完整重写 MEMORY.md。 */
-export async function writeIndex(
-	scope: MemoryScope,
-	entries: MemoryIndexEntry[],
-	channelId?: string,
-): Promise<void> {
-	ensureDir(memoriesScopeDir(scope, channelId));
-	const path = indexPath(scope, channelId);
-	await writeFile(path, renderIndex(entries), "utf8");
+export async function writeIndex(entries: MemoryIndexEntry[]): Promise<void> {
+	ensureDir(MEMORIES_DIR);
+	await writeFile(indexPath(), renderIndex(entries), "utf8");
 }
 
 export interface AppendResult {
@@ -96,12 +86,8 @@ export interface AppendResult {
  * 若 hardLimit 为 true，索引未写盘；调用方（典型流程是先写 content 文件再调本函数）
  * 应回滚已写入的 content 文件，并向用户报错。
  */
-export async function appendIndex(args: {
-	scope: MemoryScope;
-	channelId?: string;
-	entry: MemoryIndexEntry;
-}): Promise<AppendResult> {
-	const current = await readIndex(args.scope, args.channelId);
+export async function appendIndex(args: { entry: MemoryIndexEntry }): Promise<AppendResult> {
+	const current = await readIndex();
 	current.push(args.entry);
 	const text = renderIndex(current);
 	const totalLines = text.split("\n").length;
@@ -110,7 +96,7 @@ export async function appendIndex(args: {
 		return { totalLines, softWarn: true, hardLimit: true };
 	}
 
-	await writeIndex(args.scope, current, args.channelId);
+	await writeIndex(current);
 	return {
 		totalLines,
 		softWarn: totalLines > MEMORY_INDEX_SOFT_WARN,
@@ -121,16 +107,12 @@ export async function appendIndex(args: {
 /**
  * 按 indexPath 删除条目。删了多少返回多少；返回 0 表示未匹配。
  */
-export async function removeFromIndex(args: {
-	scope: MemoryScope;
-	channelId?: string;
-	indexPath: string;
-}): Promise<number> {
-	const current = await readIndex(args.scope, args.channelId);
+export async function removeFromIndex(args: { indexPath: string }): Promise<number> {
+	const current = await readIndex();
 	const next = current.filter((e) => e.indexPath !== args.indexPath);
 	const removed = current.length - next.length;
 	if (removed > 0) {
-		await writeIndex(args.scope, next, args.channelId);
+		await writeIndex(next);
 	}
 	return removed;
 }
@@ -139,16 +121,14 @@ export async function removeFromIndex(args: {
  * 根据 indexPath 更新现有条目的 description（用于 update_memory）。
  */
 export async function updateIndexEntry(args: {
-	scope: MemoryScope;
-	channelId?: string;
 	indexPath: string;
 	description: string;
 }): Promise<boolean> {
-	const current = await readIndex(args.scope, args.channelId);
+	const current = await readIndex();
 	const idx = current.findIndex((e) => e.indexPath === args.indexPath);
 	if (idx === -1) return false;
 	current[idx] = { ...current[idx]!, description: args.description };
-	await writeIndex(args.scope, current, args.channelId);
+	await writeIndex(current);
 	return true;
 }
 
@@ -156,12 +136,8 @@ export async function updateIndexEntry(args: {
  * 模糊匹配 name / description（大小写不敏感、子串）。
  * 用于 forget_memory 的查找。
  */
-export async function findIndexEntries(args: {
-	scope: MemoryScope;
-	channelId?: string;
-	keyword: string;
-}): Promise<MemoryIndexEntry[]> {
-	const current = await readIndex(args.scope, args.channelId);
+export async function findIndexEntries(args: { keyword: string }): Promise<MemoryIndexEntry[]> {
+	const current = await readIndex();
 	const k = args.keyword.toLowerCase();
 	return current.filter(
 		(e) => e.name.toLowerCase().includes(k) || e.description.toLowerCase().includes(k),
@@ -169,10 +145,9 @@ export async function findIndexEntries(args: {
 }
 
 /** 直接读 MEMORY.md 原文，用于 prompt 注入。 */
-export async function readIndexRaw(scope: MemoryScope, channelId?: string): Promise<string> {
-	const path = indexPath(scope, channelId);
+export async function readIndexRaw(): Promise<string> {
 	try {
-		return (await readFile(path, "utf8")).trim();
+		return (await readFile(indexPath(), "utf8")).trim();
 	} catch (err: any) {
 		if (err?.code === "ENOENT") return "";
 		throw err;

@@ -4,9 +4,6 @@ export type MemoryType = (typeof MEMORY_TYPES)[number];
 export const MEMORY_SUBJECTS = ["user", "agent", "world", "reference"] as const;
 export type MemorySubject = (typeof MEMORY_SUBJECTS)[number];
 
-export const MEMORY_SCOPES = ["global", "channel"] as const;
-export type MemoryScope = (typeof MEMORY_SCOPES)[number];
-
 export interface MemoryFrontmatter {
 	name: string;
 	description: string;
@@ -29,7 +26,6 @@ export interface MemoryEntry {
 	absolutePath: string;
 	/** 索引相对路径，如 `procedural/agent_chinese_reply.md` */
 	indexPath: string;
-	scope: MemoryScope;
 }
 
 export interface MemoryIndexEntry {

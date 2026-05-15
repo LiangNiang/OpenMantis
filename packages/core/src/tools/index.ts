@@ -165,10 +165,7 @@ export async function resolveTools(
 			case "memory": {
 				if (config?.memory?.enabled === false) break;
 				if (!channelCtx) break;
-				const memTools = createMemoryTools({
-					channelId: channelCtx.channelId,
-					model: channelCtx.model,
-				});
+				const memTools = createMemoryTools({ model: channelCtx.model });
 				Object.assign(tools, memTools);
 				guides.push(MEMORY_TOOL_GUIDE);
 				break;

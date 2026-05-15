@@ -3,9 +3,9 @@
 import { readdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createLogger } from "@openmantis/common/logger";
-import { ensureDir, memoriesScopeDir } from "@openmantis/common/paths";
+import { ensureDir, MEMORIES_DIR } from "@openmantis/common/paths";
 import matter from "gray-matter";
-import type { MemoryEntry, MemoryFrontmatter, MemoryScope, MemoryType } from "./types";
+import type { MemoryEntry, MemoryFrontmatter, MemoryType } from "./types";
 
 const logger = createLogger("core/memory");
 
@@ -39,8 +39,8 @@ export function buildFilename(subject: string, name: string, now: Date = new Dat
 	return `${subject}_${ts}.md`;
 }
 
-function typeDir(scope: MemoryScope, type: MemoryType, channelId?: string): string {
-	return join(memoriesScopeDir(scope, channelId), type);
+function typeDir(type: MemoryType): string {
+	return join(MEMORIES_DIR, type);
 }
 
 /** 检查目标文件是否存在。 */
@@ -58,12 +58,10 @@ export async function fileExists(path: string): Promise<boolean> {
  * 调用方负责 conflict 检测、字段校验、相对日期归一化。
  */
 export async function writeMemory(args: {
-	scope: MemoryScope;
-	channelId?: string;
 	frontmatter: MemoryFrontmatter;
 	body: string;
 }): Promise<{ filename: string; absolutePath: string; indexPath: string }> {
-	const dir = typeDir(args.scope, args.frontmatter.type, args.channelId);
+	const dir = typeDir(args.frontmatter.type);
 	ensureDir(dir);
 	const filename = buildFilename(args.frontmatter.subject, args.frontmatter.name);
 	const absolutePath = join(dir, filename);
@@ -87,12 +85,10 @@ export async function writeMemory(args: {
 
 /** 读取单条 memory。文件不存在抛错。 */
 export async function readMemory(args: {
-	scope: MemoryScope;
-	channelId?: string;
 	type: MemoryType;
 	filename: string;
 }): Promise<MemoryEntry> {
-	const dir = typeDir(args.scope, args.type, args.channelId);
+	const dir = typeDir(args.type);
 	const absolutePath = join(dir, args.filename);
 	const raw = await readFile(absolutePath, "utf8");
 	const parsed = matter(raw);
@@ -102,17 +98,12 @@ export async function readMemory(args: {
 		filename: args.filename,
 		absolutePath,
 		indexPath: `${args.type}/${args.filename}`,
-		scope: args.scope,
 	};
 }
 
-/** 列出某个 scope + type 下的所有 memory。目录不存在则返回空数组。 */
-export async function listMemoriesByType(args: {
-	scope: MemoryScope;
-	channelId?: string;
-	type: MemoryType;
-}): Promise<MemoryEntry[]> {
-	const dir = typeDir(args.scope, args.type, args.channelId);
+/** 列出某 type 下的所有 memory。目录不存在则返回空数组。 */
+export async function listMemoriesByType(args: { type: MemoryType }): Promise<MemoryEntry[]> {
+	const dir = typeDir(args.type);
 	let names: string[] = [];
 	try {
 		const all = await readdir(dir);
@@ -133,12 +124,10 @@ export async function listMemoriesByType(args: {
 
 /** 删除单条 memory 文件。文件不存在视为成功。 */
 export async function deleteMemoryFile(args: {
-	scope: MemoryScope;
-	channelId?: string;
 	type: MemoryType;
 	filename: string;
 }): Promise<void> {
-	const dir = typeDir(args.scope, args.type, args.channelId);
+	const dir = typeDir(args.type);
 	const absolutePath = join(dir, args.filename);
 	try {
 		await unlink(absolutePath);
@@ -152,15 +141,13 @@ export async function deleteMemoryFile(args: {
  * 不允许改 type / subject / name / created。
  */
 export async function patchMemory(args: {
-	scope: MemoryScope;
-	channelId?: string;
 	type: MemoryType;
 	filename: string;
 	patch: { description?: string; body?: string } & Partial<
 		Pick<MemoryFrontmatter, "when" | "significance" | "trigger" | "deadline">
 	>;
 }): Promise<MemoryEntry> {
-	const current = await readMemory(args);
+	const current = await readMemory({ type: args.type, filename: args.filename });
 	const nextFm: MemoryFrontmatter = { ...current.frontmatter };
 	if (args.patch.description !== undefined) nextFm.description = args.patch.description;
 	if (args.patch.when !== undefined) nextFm.when = args.patch.when;

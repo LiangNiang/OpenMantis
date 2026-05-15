@@ -4,7 +4,7 @@ import type { LanguageModelV3 } from "@ai-sdk/provider";
 import { createLogger } from "@openmantis/common/logger";
 import { generateText } from "ai";
 import { listMemoriesByType } from "./file-store";
-import type { MemoryFrontmatter, MemoryScope } from "./types";
+import type { MemoryFrontmatter } from "./types";
 
 const logger = createLogger("core/memory");
 
@@ -23,13 +23,9 @@ export type ConflictVerdict =
 
 export async function detectConflictV2(args: {
 	model: LanguageModelV3;
-	scope: MemoryScope;
-	channelId?: string;
 	candidate: { frontmatter: MemoryFrontmatter; body: string };
 }): Promise<ConflictVerdict> {
 	const existing = await listMemoriesByType({
-		scope: args.scope,
-		channelId: args.channelId,
 		type: args.candidate.frontmatter.type,
 	});
 
@@ -45,7 +41,7 @@ export async function detectConflictV2(args: {
 	const candText = `name: ${args.candidate.frontmatter.name}\ndescription: ${args.candidate.frontmatter.description}\nbody: ${args.candidate.body}`;
 
 	const prompt = `You are a memory deduplication assistant for a long-term memory system.
-Given EXISTING memory entries (same scope + same type as the candidate) and a CANDIDATE entry,
+Given EXISTING memory entries (same type as the candidate) and a CANDIDATE entry,
 decide whether the candidate is:
 
 1. "duplicate" — same fact already recorded; saving would be redundant.

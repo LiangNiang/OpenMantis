@@ -10,7 +10,7 @@ import { type ChannelToolProviders, resolveTools } from "../tools";
 
 const logger = createLogger("core/agent");
 
-import { memoriesScopeDir } from "@openmantis/common/paths";
+import { MEMORIES_DIR } from "@openmantis/common/paths";
 import { readIndexRaw } from "../tools/memory/index-store";
 import { buildStructuredPrompt } from "./prompts";
 import { createLanguageModel } from "./providers";
@@ -85,26 +85,18 @@ export class AgentFactory {
 			instructions += `\n\n## 可用技能\n\n${skillInstructions.trim()}`;
 		}
 
-		// Inject MEMORY.md indices (global + channel) into system prompt
+		// Inject MEMORY.md index into system prompt.
 		// Gate on memory config / excludeTools so prompt stays consistent with tool availability.
 		const memoryEnabled =
 			this.config.memory?.enabled !== false && !this.config.excludeTools.includes("memory");
 		if (memoryEnabled) {
 			try {
-				const globalIndex = await readIndexRaw("global");
-				if (globalIndex) {
-					const globalDir = memoriesScopeDir("global");
-					instructions += `\n\n## Global Memory (cross-channel)\nFiles live under \`${globalDir}/\`. Read with absolute paths (prepend the base dir to each entry's link).\n${globalIndex}`;
-				}
-				if (options?.channelId) {
-					const channelIndex = await readIndexRaw("channel", options.channelId);
-					if (channelIndex) {
-						const channelDir = memoriesScopeDir("channel", options.channelId);
-						instructions += `\n\n## Channel Memory (${options.channelId})\nFiles live under \`${channelDir}/\`. Read with absolute paths (prepend the base dir to each entry's link).\n${channelIndex}`;
-					}
+				const index = await readIndexRaw();
+				if (index) {
+					instructions += `\n\n## Memory\nFiles live under \`${MEMORIES_DIR}/\`. Read with absolute paths (prepend the base dir to each entry's link).\n${index}`;
 				}
 			} catch (err) {
-				logger.warn("[agent] failed to load memory indices, skipping:", err);
+				logger.warn("[agent] failed to load memory index, skipping:", err);
 			}
 		}
 
