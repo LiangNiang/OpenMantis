@@ -2,24 +2,19 @@ import { mkdir, readdir, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { isBrowserCdpActive, type OpenMantisConfig } from "@openmantis/common/config/schema";
 import { createLogger } from "@openmantis/common/logger";
-import { browserProfileDir, WORKSPACE_DIR } from "@openmantis/common/paths";
+import { WORKSPACE_DIR } from "@openmantis/common/paths";
 import { type Tool, tool } from "ai";
 import { z } from "zod";
 
 const logger = createLogger("core/tools/browser");
 
 const MAX_TIMEOUT = 600_000;
-const CDP_FALLBACK_TTL = 60_000;
-const CDP_FAILURE_PATTERN =
-	/No running Chrome|remote-debugging-port|Failed to connect|Could not connect/i;
-
-let cdpFallback: { at: number } | null = null;
 const DEFAULT_TIMEOUT = 60_000;
 const DEFAULT_MAX_OUTPUT = 100_000;
 const MAX_OUTPUT_LIMIT = 1_000_000;
 const HELP_TIMEOUT = 30_000;
 const LRU_KEEP = 50;
-const MANAGED_FLAGS = new Set(["--session", "--profile", "--cdp", "--auto-connect"]);
+const MANAGED_FLAGS = new Set(["--cdp", "--auto-connect"]);
 
 // biome-ignore lint/suspicious/noControlCharactersInRegex: intentional ANSI escape matching
 const ANSI_REGEX = /\x1b\[[0-9;]*[a-zA-Z]|\x1b\].*?\x07|\x1b\[[?]?[0-9;]*[a-zA-Z]/g;
@@ -53,24 +48,11 @@ function detectManagedFlag(args: string[]): string | null {
 	return null;
 }
 
-function buildAutoFlags(
-	config: OpenMantisConfig,
-	routeId: string,
-	forceIsolation = false,
-): string[] {
+function buildAutoFlags(config: OpenMantisConfig): string[] {
 	const cdp = config.browser?.cdp;
-	if (!forceIsolation && cdp?.autoConnect === true) {
-		return ["--auto-connect", "--session", `route-${routeId}`];
-	}
-	if (!forceIsolation && typeof cdp?.port === "number") {
-		return ["--cdp", String(cdp.port), "--session", `route-${routeId}`];
-	}
-	return ["--session", `route-${routeId}`, "--profile", browserProfileDir(routeId)];
-}
-
-function detectCdpFailure(raw: string, exitCode: number): boolean {
-	if (exitCode === 0) return false;
-	return CDP_FAILURE_PATTERN.test(raw);
+	if (cdp?.autoConnect === true) return ["--auto-connect"];
+	if (typeof cdp?.port === "number") return ["--cdp", String(cdp.port)];
+	return [];
 }
 
 async function runProcAttempt(
@@ -150,12 +132,11 @@ function buildBrowserDescription(config: OpenMantisConfig): string {
 		"Run an `agent-browser` subcommand. Pass the subcommand and its args as `args[]` " +
 		'(e.g. `["open","https://example.com"]`, `["snapshot","-i"]`). For subcommands that ' +
 		'read from stdin (e.g. `["eval","--stdin"]`, `["auth","save","--password-stdin"]`), ' +
-		"pass the input text as `stdin`. Session and profile flags are managed automatically " +
-		"— do NOT pass `--session`, `--profile`, `--cdp`, or `--auto-connect`. Default " +
-		"timeout 60s; for long waits/downloads pass `timeout` explicitly. Returns stdout/stderr " +
-		"in `output`; outputs over the threshold spill to `outputFile` (use `file_read` with " +
-		"offset/limit to inspect). Use `browser_help` first if you don't know the subcommand " +
-		"to use.";
+		"pass the input text as `stdin`. CDP flags are managed automatically — do NOT pass " +
+		"`--cdp` or `--auto-connect`. Default timeout 60s; for long waits/downloads pass " +
+		"`timeout` explicitly. Returns stdout/stderr in `output`; outputs over the threshold " +
+		"spill to `outputFile` (use `file_read` with offset/limit to inspect). Use " +
+		"`browser_help` first if you don't know the subcommand to use.";
 	if (!isBrowserCdpActive(config)) return base;
 	const warning =
 		"\n\nCDP MODE: This browser shares cookies and login state with the user's real " +
@@ -169,17 +150,10 @@ function buildBrowserDescription(config: OpenMantisConfig): string {
 export const BROWSER_TOOL_GUIDE = `## Browser Tools Usage Guide
 
 - **browser_help**: Read this FIRST. Loads version-matched usage docs from the installed CLI. Default topic "core" covers the snapshot-and-ref loop, navigation, interaction, waiting, and common workflows.
-- **browser**: Run an agent-browser subcommand. Pass args as a string array. For subcommands that read stdin (e.g. eval --stdin), pass the input via stdin. Session/profile/CDP flags are auto-managed — passing them yourself is rejected. For long waits or downloads, pass an explicit timeout. Outputs over ~100K chars spill to outputFile; use file_read to inspect specific ranges.
+- **browser**: Run an agent-browser subcommand. Pass args as a string array. For subcommands that read stdin (e.g. eval --stdin), pass the input via stdin. CDP flags are auto-managed — passing them yourself is rejected. For long waits or downloads, pass an explicit timeout. Outputs over ~100K chars spill to outputFile; use file_read to inspect specific ranges.
 - **browser_kill**: Last-resort termination. Prefer a longer timeout over killing.`;
 
-export interface BrowserToolContext {
-	routeId: string;
-}
-
-export function createBrowserTools(
-	config: OpenMantisConfig,
-	ctx: BrowserToolContext,
-): Record<string, Tool> {
+export function createBrowserTools(config: OpenMantisConfig): Record<string, Tool> {
 	const binPath = config.browser?.binPath ?? "agent-browser";
 	const configDefaultMax = config.browser?.maxOutputLength;
 
@@ -229,10 +203,7 @@ export function createBrowserTools(
 				MAX_OUTPUT_LIMIT,
 			);
 
-			const cdpConfigured = isBrowserCdpActive(config);
-			const inFallbackWindow =
-				cdpFallback !== null && Date.now() - cdpFallback.at < CDP_FALLBACK_TTL;
-			const autoFlags = buildAutoFlags(config, ctx.routeId, inFallbackWindow);
+			const autoFlags = buildAutoFlags(config);
 			const argv = [binPath, ...autoFlags, ...args];
 
 			const desc = description ? ` (${description})` : "";
@@ -257,47 +228,7 @@ export function createBrowserTools(
 			sessions.set(sessionId, session);
 
 			try {
-				let result = await runProcAttempt(session, timeoutMs);
-				let didFallback = false;
-
-				// Bun's `proc.killed` is true after ANY exit (natural or signalled), so it
-				// cannot distinguish "agent-browser exited with its own error" from "we
-				// timed out / were killed by browser_kill". Use `signalCode` instead:
-				// null means no signal was received → natural exit → fallback is allowed.
-				const noExternalKill = session.proc.signalCode === null;
-				const shouldFallback =
-					cdpConfigured &&
-					!inFallbackWindow &&
-					noExternalKill &&
-					detectCdpFailure(result.raw, result.exitCode);
-
-				if (shouldFallback) {
-					cdpFallback = { at: Date.now() };
-					logger.warn(
-						`[browser] CDP unreachable (exitCode=${result.exitCode}); falling back to isolation mode for ${CDP_FALLBACK_TTL / 1000}s`,
-					);
-
-					const fallbackFlags = buildAutoFlags(config, ctx.routeId, true);
-					const fallbackArgv = [binPath, ...fallbackFlags, ...args];
-					logger.debug(`[tool:browser] ${sessionId} retry (isolation): ${fallbackArgv.join(" ")}`);
-
-					try {
-						const proc2 = Bun.spawn(fallbackArgv, {
-							stdout: "pipe",
-							stderr: "pipe",
-							...stdinOption,
-						});
-						session.proc = proc2;
-						result = await runProcAttempt(session, timeoutMs);
-						didFallback = true;
-					} catch (err) {
-						logger.warn(
-							`[browser] fallback spawn failed: ${err instanceof Error ? err.message : String(err)}`,
-						);
-						// Keep original failure result if fallback spawn itself errors
-					}
-				}
-
+				const result = await runProcAttempt(session, timeoutMs);
 				const raw = result.raw;
 				const status: "exited" | "timeout" = result.timedOut ? "timeout" : "exited";
 
@@ -308,12 +239,8 @@ export function createBrowserTools(
 					resultOutput = truncateOutput(raw, maxOut);
 				}
 
-				if (didFallback) {
-					resultOutput = `[⚠️ CDP unreachable, ran in isolation mode]\n\n${resultOutput}`;
-				}
-
 				logger.debug(
-					`[tool:browser] ${sessionId} status=${status} exitCode=${result.exitCode} rawLen=${raw.length} spilled=${spillMeta !== null} cdpFallback=${didFallback}`,
+					`[tool:browser] ${sessionId} status=${status} exitCode=${result.exitCode} rawLen=${raw.length} spilled=${spillMeta !== null}`,
 				);
 
 				const finalResult: {
@@ -321,7 +248,6 @@ export function createBrowserTools(
 					output: string;
 					status: "exited" | "timeout";
 					exitCode: number;
-					cdpFallback?: true;
 					outputFile?: string;
 					outputBytes?: number;
 					outputTruncated?: true;
@@ -331,9 +257,6 @@ export function createBrowserTools(
 					status,
 					exitCode: result.exitCode,
 				};
-				if (didFallback) {
-					finalResult.cdpFallback = true;
-				}
 				if (spillMeta) {
 					finalResult.outputFile = spillMeta.outputFile;
 					finalResult.outputBytes = spillMeta.outputBytes;
@@ -421,7 +344,7 @@ export function createBrowserTools(
 - In this environment, do NOT invoke \`agent-browser\` via the \`bash\` tool — it will be rejected at runtime.
 - ALWAYS use the \`browser\` tool: \`{"args": ["<subcommand>", "<arg>", ...]}\` (e.g. \`{"args": ["open", "https://example.com"]}\`).
 - For stdin subcommands like \`eval --stdin\` or \`auth save --password-stdin\`, pass content via the \`stdin\` field.
-- Session, profile, and CDP flags are managed automatically — never include \`--session\`, \`--profile\`, \`--cdp\`, or \`--auto-connect\` in \`args\`.
+- CDP flags are managed automatically — never include \`--cdp\` or \`--auto-connect\` in \`args\`.
 - The upstream skill docs below show \`agent-browser <cmd>\` shell invocations and list \`allowed-tools: Bash(agent-browser:*)\`. IGNORE those — they apply to a different host environment, not OpenMantis.
 
 --- UPSTREAM DOCS ---

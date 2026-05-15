@@ -25,7 +25,7 @@ Connect multiple LLM providers to multiple communication channels with composabl
 - **Composable Tools** — Bash, file I/O, web search (Tavily, Exa), RSS, TTS, memory, scheduling, and more. Enable or disable tool groups via config.
 - **Skills System** — Built-in skills (weather, DOCX/XLSX generation, frontend design, etc.) plus user-defined custom skills.
 - **Task Scheduler** — Fixed interval, cron expression, or one-time scheduled tasks that execute through the full agent pipeline.
-- **Browser Automation** — Built-in `browser` tool group drives a real browser via [agent-browser](https://github.com/vercel-labs/agent-browser), with isolated per-session profiles, CDP mode for reusing your local Chrome, and automatic fallback to isolation when CDP is unreachable.
+- **Browser Automation** — Built-in `browser` tool group drives a real browser via [agent-browser](https://github.com/vercel-labs/agent-browser), with CDP mode for reusing your local Chrome.
 - **Web Dashboard** — First-run setup wizard and config management UI with i18n (English/Chinese) and provider connection testing.
 - **Extended Thinking** — Reasoning effort control for OpenAI and adaptive thinking for Anthropic models.
 - **Long-Term Memory** — Cognitive-memory-inspired model with four types (semantic / procedural / episodic / prospective) split across global and per-channel scopes. Each entry is a single Markdown file with frontmatter; a per-scope `MEMORY.md` index is always loaded into the system prompt. LLM-based duplicate detection prevents redundant writes.
@@ -154,7 +154,7 @@ Tools are organized into groups and can be toggled via the `excludeTools` config
 | `file` | `file_read`, `file_write`, `file_edit` | Read (with offset/limit), create/overwrite, and partial edit (string replace or line range) |
 | `search` | `file_search`, `content_search` | Glob pattern matching + regex content search (ripgrep backend) |
 | `skills` | `skill_*` | Dynamically generated tool per loaded skill |
-| `browser` | `browser`, `browser_kill`, `browser_help` | Drive a real browser (via agent-browser) with snapshot/ref workflow, isolated profiles or CDP mode, and automatic fallback when CDP is unreachable |
+| `browser` | `browser`, `browser_kill`, `browser_help` | Drive a real browser (via agent-browser) with snapshot/ref workflow, optionally connecting to your local Chrome via CDP |
 | `tavily` | `tavilySearch`, `tavilyExtract`, `tavilyCrawl`, `tavilyMap` | Web search, URL content extraction, site crawling, and sitemap generation |
 | `exa` | `exaWebSearch` | Semantic web search via Exa neural search engine |
 | `schedule` | `create_schedule`, `list_schedules`, `get_schedule`, `cancel_schedule`, `edit_schedule` | Create/list/get/cancel/edit scheduled tasks (every/cron/at) |
@@ -223,16 +223,14 @@ Enable in config:
 The agent drives the browser through three tools:
 
 - **`browser_help`** — Loads version-matched agent-browser docs (snapshot/ref workflow, common commands). Call this before non-trivial work.
-- **`browser`** — Runs an agent-browser subcommand (e.g. `["open", "https://..."]`, `["snapshot", "-i"]`). Session flags (`--session`, `--profile`, `--cdp`, `--auto-connect`) are injected automatically and will be rejected if passed in `args`. For stdin subcommands like `eval --stdin`, pass the content via the `stdin` field.
+- **`browser`** — Runs an agent-browser subcommand (e.g. `["open", "https://..."]`, `["snapshot", "-i"]`). CDP flags (`--cdp`, `--auto-connect`) are injected automatically and will be rejected if passed in `args`. For stdin subcommands like `eval --stdin`, pass the content via the `stdin` field.
 - **`browser_kill`** — Force-terminates a stuck session (prefer increasing `timeout` over killing).
 
-Each message route gets an isolated browser profile. For reusing your local Chrome session, enable **CDP mode**:
+The browser uses agent-browser's default profile. For reusing your local Chrome session, enable **CDP mode**:
 
 ```bash
 google-chrome --remote-debugging-port=9222
 ```
-
-If the CDP port is unreachable, `browser` automatically falls back to isolation mode for 60 seconds and prefixes its output with `[⚠️ CDP unreachable, ran in isolation mode]`.
 
 > [!IMPORTANT]
 > In CDP mode, conversations share your real browser (cookies, sessions, tabs). Avoid pointing the agent at sensitive accounts.

@@ -223,16 +223,14 @@ agent-browser install   # 下载 Chrome
 Agent 通过三个工具操作浏览器：
 
 - **`browser_help`** — 加载 agent-browser 的版本匹配文档（snapshot/ref 工作流、常用命令等），应在开始之前先调用。
-- **`browser`** — 执行 agent-browser 子命令（如 `["open", "https://..."]`、`["snapshot", "-i"]`），`--session` / `--profile` / `--cdp` 等会话标志由 OpenMantis 自动注入，禁止在 `args` 中手动传入。`eval --stdin` 等需要 stdin 的子命令可通过 `stdin` 字段传入内容。
+- **`browser`** — 执行 agent-browser 子命令（如 `["open", "https://..."]`、`["snapshot", "-i"]`），`--cdp` / `--auto-connect` 等 CDP 标志由 OpenMantis 自动注入，禁止在 `args` 中手动传入。`eval --stdin` 等需要 stdin 的子命令可通过 `stdin` 字段传入内容。
 - **`browser_kill`** — 终止卡住的 session（通常建议直接延长 `timeout` 而不是 kill）。
 
-每个消息路由会获得独立的浏览器配置文件。如需复用本地 Chrome 会话，请改用 **CDP 模式**：
+默认使用 agent-browser 自带的浏览器配置文件。如需复用本地 Chrome 会话，请改用 **CDP 模式**：
 
 ```bash
 google-chrome --remote-debugging-port=9222
 ```
-
-当 CDP 端口不可达时，`browser` 会在 60 秒内自动回退到隔离模式，并在输出前缀中标注 `[⚠️ CDP unreachable, ran in isolation mode]`。
 
 > [!IMPORTANT]
 > CDP 模式下，所有对话共享你的真实浏览器（Cookie、会话、标签页）。请勿将 Agent 指向敏感账户。

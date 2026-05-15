@@ -1,7 +1,6 @@
-import { mkdir, readdir, rm, unlink } from "node:fs/promises";
+import { mkdir, readdir, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { createLogger } from "@openmantis/common/logger";
-import { browserProfileDir } from "@openmantis/common/paths";
 
 const logger = createLogger("core/gateway");
 
@@ -27,11 +26,9 @@ export class RouteStore {
 	private cache = new Map<string, Route>();
 	private dir: string;
 	private initialized = false;
-	private cdpActive: () => boolean;
 
-	constructor(dir: string, cdpActive: () => boolean = () => false) {
+	constructor(dir: string) {
 		this.dir = dir;
-		this.cdpActive = cdpActive;
 	}
 
 	private async ensureDir(): Promise<void> {
@@ -100,22 +97,14 @@ export class RouteStore {
 
 	async delete(id: string): Promise<boolean> {
 		this.cache.delete(id);
-		let ok = true;
 		try {
 			await unlink(this.filePath(id));
 			logger.debug(`[route-store] deleted route: ${id}`);
+			return true;
 		} catch (err) {
 			logger.warn(`[route-store] failed to delete route ${id}:`, err);
-			ok = false;
+			return false;
 		}
-		if (!this.cdpActive()) {
-			try {
-				await rm(browserProfileDir(id), { recursive: true, force: true });
-			} catch (err) {
-				logger.warn(`[route-store] failed to clean browser profile for ${id}:`, err);
-			}
-		}
-		return ok;
 	}
 
 	async list(): Promise<RouteSummary[]> {

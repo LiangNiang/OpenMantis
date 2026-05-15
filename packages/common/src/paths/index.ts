@@ -34,12 +34,6 @@ export function memoriesScopeDir(scope: "global" | "channel", channelId?: string
 export const WORKSPACE_DIR = join(OPENMANTIS_HOME, "workspace");
 export const SKILLS_DIR = join(OPENMANTIS_HOME, "skills");
 
-export const BROWSER_PROFILES_DIR = join(OPENMANTIS_HOME, "browser-profiles");
-
-export function browserProfileDir(routeId: string): string {
-	return join(BROWSER_PROFILES_DIR, routeId);
-}
-
 export function routeFile(id: string): string {
 	return join(ROUTES_DIR, `${id}.json`);
 }

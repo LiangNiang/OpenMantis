@@ -1,5 +1,5 @@
 import { getWecomClient } from "@openmantis/channel-wecom";
-import { isBrowserCdpActive, type OpenMantisConfig } from "@openmantis/common/config/schema";
+import type { OpenMantisConfig } from "@openmantis/common/config/schema";
 import { createLogger } from "@openmantis/common/logger";
 import { ROUTES_DIR } from "@openmantis/common/paths";
 import { getTtsProvider, uploadToChannel } from "@openmantis/tts";
@@ -209,7 +209,7 @@ export class Gateway {
 		this.channels = channels;
 		this.channelBindings = options?.channelBindings;
 		const routeDir = options?.routeDir ?? ROUTES_DIR;
-		this.routeStore = new RouteStore(routeDir, () => isBrowserCdpActive(this.config));
+		this.routeStore = new RouteStore(routeDir);
 		this.factory = new AgentFactory(config, options?.channelToolProviders);
 	}
 

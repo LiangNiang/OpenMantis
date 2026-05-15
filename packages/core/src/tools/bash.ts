@@ -254,9 +254,9 @@ When status is "waiting_for_input", the command either produced no output within
 			if (detectAgentBrowserInvocation(command)) {
 				return {
 					error:
-						"agent-browser must be invoked through the `browser` tool to preserve session isolation. " +
+						"agent-browser must be invoked through the `browser` tool. " +
 						'Use `{"args": ["<subcommand>", "<arg>", ...]}` (e.g. `{"args": ["open", "https://example.com"]}`). ' +
-						"For stdin subcommands use the `stdin` field. Session/profile/CDP flags are auto-managed.",
+						"For stdin subcommands use the `stdin` field. CDP flags are auto-managed.",
 				};
 			}
 			const timeoutMs = Math.min(timeout ?? defaultTimeoutMs, MAX_TIMEOUT);

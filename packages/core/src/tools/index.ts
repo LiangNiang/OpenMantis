@@ -86,11 +86,7 @@ export async function resolveTools(
 			}
 			case "browser": {
 				if (!config || config.browser?.enabled !== true) break;
-				if (!channelCtx?.routeId) {
-					logger.debug("[resolveTools] skipping browser tools: no routeId");
-					break;
-				}
-				const browserTools = createBrowserTools(config, { routeId: channelCtx.routeId });
+				const browserTools = createBrowserTools(config);
 				Object.assign(tools, browserTools);
 				guides.push(BROWSER_TOOL_GUIDE);
 				break;
