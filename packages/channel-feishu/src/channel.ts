@@ -173,10 +173,6 @@ export class FeishuChannel {
 			name: m.name,
 		}));
 
-		// Extract sender info for @mention support
-		const sender = data?.sender;
-		const senderOpenId = sender?.sender_id?.open_id as string | undefined;
-
 		// In group chats, only respond if this bot is @mentioned
 		if (chatType === "group") {
 			const botOpenId = getBotOpenId(this.type);
@@ -209,7 +205,7 @@ export class FeishuChannel {
 
 		if (textContent.startsWith("/") && this.commandRouter) {
 			logger.debug(`[feishu] routing to command: ${textContent.split(/\s+/)[0]}`);
-			this.executeCommand(textContent, chatId, channelId, onMessage, senderOpenId);
+			this.executeCommand(textContent, chatId, channelId, onMessage);
 			return;
 		}
 
@@ -219,7 +215,6 @@ export class FeishuChannel {
 		// Download attachments then forward to agent
 		const attachmentTypeLabel =
 			parsed.attachments[0]?.resourceType === "image" ? "[image]" : "[attachment]";
-		const senderMeta = { senderOpenId };
 		downloadAttachments(this.client, messageId, parsed.attachments)
 			.then((files) => {
 				const fallbackText = textContent || (files.length > 0 ? "" : attachmentTypeLabel);
@@ -230,7 +225,6 @@ export class FeishuChannel {
 					fallbackText,
 					onMessage,
 					files.length > 0 ? files : undefined,
-					senderMeta,
 				);
 			})
 			.catch((err) => {
@@ -241,8 +235,6 @@ export class FeishuChannel {
 					routeId,
 					textContent || attachmentTypeLabel,
 					onMessage,
-					undefined,
-					senderMeta,
 				);
 			});
 	}
@@ -252,7 +244,6 @@ export class FeishuChannel {
 		chatId: string,
 		channelId: string,
 		onMessage: OnMessageCallback<StreamEvent>,
-		senderOpenId?: string,
 	): void {
 		if (!this.commandRouter) return;
 
@@ -275,7 +266,6 @@ export class FeishuChannel {
 			switchRoute: (newId) => this.channelBindings.set(this.type, chatId, newId),
 			sendToAgent,
 			metadata: {
-				...(senderOpenId ? { senderOpenId } : {}),
 				botOpenId: getBotOpenId(this.type) ?? undefined,
 			},
 		};
@@ -314,7 +304,6 @@ export class FeishuChannel {
 		content: string,
 		onMessage: OnMessageCallback<StreamEvent>,
 		files?: FileAttachment[],
-		senderMeta?: { senderOpenId?: string },
 	): void {
 		const doHandle = async () => {
 			const { stream, response } = await onMessage({
@@ -323,10 +312,7 @@ export class FeishuChannel {
 				routeId,
 				content,
 				files: files?.length ? files : undefined,
-				metadata: {
-					receivedAt: Date.now(),
-					...(senderMeta?.senderOpenId ? { senderOpenId: senderMeta.senderOpenId } : {}),
-				},
+				metadata: { receivedAt: Date.now() },
 			});
 
 			try {

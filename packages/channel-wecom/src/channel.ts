@@ -352,7 +352,6 @@ export class WeComChannel {
 		// Download attachments then forward to agent
 		const attachmentTypeLabel =
 			parsed.attachments[0]?.resourceType === "image" ? "[image]" : "[attachment]";
-		const senderMeta = { userId: msg.from?.userid, chatType };
 		downloadWeComAttachments(this.client!, parsed.attachments)
 			.then((files) => {
 				const fallbackText = textContent || (files.length > 0 ? "" : attachmentTypeLabel);
@@ -362,7 +361,6 @@ export class WeComChannel {
 					fallbackText,
 					frameHeaders,
 					files.length > 0 ? files : undefined,
-					senderMeta,
 				);
 			})
 			.catch((err) => {
@@ -372,8 +370,6 @@ export class WeComChannel {
 					routeId,
 					textContent || attachmentTypeLabel,
 					frameHeaders,
-					undefined,
-					senderMeta,
 				);
 			});
 	}
@@ -384,7 +380,6 @@ export class WeComChannel {
 		content: string,
 		frame: WsFrameHeaders,
 		files?: FileAttachment[],
-		senderMeta?: { userId?: string; chatType?: string },
 	): void {
 		handleAgentMessage({
 			channelType: this.type,
@@ -392,7 +387,6 @@ export class WeComChannel {
 			routeId,
 			content,
 			files,
-			metadata: senderMeta,
 			onMessage: this.onMessage!,
 			streamReply: async (stream) => {
 				return await streamWeComResponse(this.client!, frame, stream);
