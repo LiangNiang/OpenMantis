@@ -44,14 +44,13 @@ async function buildAgentMessages(
 	if (!files || files.length === 0) return messages;
 
 	const imageFiles = files.filter((f) => f.mimeType?.startsWith("image/"));
-	const otherFiles = files.filter((f) => !f.mimeType?.startsWith("image/"));
 
-	// Build text content with file path annotations for non-image files
+	// Annotate every file with its on-disk path so the agent can locate it for
+	// image-to-image / OCR / file-read tools. Images additionally get attached
+	// as multi-modal vision input below.
 	let textContent = incoming.content;
-	if (otherFiles.length > 0) {
-		const annotations = otherFiles.map((f) => `[附件: ${f.fileName} → ${f.path}]`).join("\n");
-		textContent = textContent ? `${textContent}\n${annotations}` : annotations;
-	}
+	const annotations = files.map((f) => `[附件: ${f.fileName} → ${f.path}]`).join("\n");
+	textContent = textContent ? `${textContent}\n${annotations}` : annotations;
 
 	const multiModalContent: (
 		| { type: "text"; text: string }
