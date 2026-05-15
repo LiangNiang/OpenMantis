@@ -263,11 +263,7 @@ export class Gateway {
 	async handleMessage(incoming: IncomingMessage): Promise<GatewayResponse> {
 		const startTime = Date.now();
 
-		let route = await this.routeStore.getOrCreate(
-			incoming.routeId,
-			incoming.channelType,
-			incoming.channelId,
-		);
+		let route = await this.routeStore.getOrCreate(incoming.routeId);
 		const isNewRoute = route.messages.length === 0;
 		logger.debug(
 			`[gateway] route ${isNewRoute ? "created" : "resumed"}: ${route.id}` +
@@ -309,7 +305,7 @@ export class Gateway {
 					`old=${oldRoute.id} (idle ${Math.round((Date.now() - oldRoute.updatedAt) / 60_000)}m, ` +
 					`${oldRoute.messages.length} msgs) -> new=${newId}`,
 			);
-			route = await this.routeStore.create(newId, incoming.channelType, incoming.channelId);
+			route = await this.routeStore.create(newId);
 			if (this.channelBindings) {
 				try {
 					await this.channelBindings.set(

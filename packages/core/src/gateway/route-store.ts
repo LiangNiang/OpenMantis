@@ -4,13 +4,12 @@ import { createLogger } from "@openmantis/common/logger";
 
 const logger = createLogger("core/gateway");
 
-import type { ChannelRef, Route } from "./route";
+import type { Route } from "./route";
 
 export interface RouteSummary {
 	id: string;
 	modelId?: string;
 	messageCount: number;
-	connectedChannels: ChannelRef[];
 	createdAt: number;
 	updatedAt: number;
 }
@@ -53,10 +52,7 @@ export class RouteStore {
 			const route: Route = {
 				id: data.id,
 				provider: data.provider,
-				originChannelType: data.originChannelType,
-				originChannelId: data.originChannelId,
 				messages: data.messages ?? [],
-				connectedChannels: data.connectedChannels ?? [],
 				createdAt: data.createdAt,
 				updatedAt: data.updatedAt,
 				recaps: data.recaps ?? [],
@@ -77,9 +73,6 @@ export class RouteStore {
 				{
 					id: route.id,
 					provider: route.provider,
-					originChannelType: route.originChannelType,
-					originChannelId: route.originChannelId,
-					connectedChannels: route.connectedChannels,
 					createdAt: route.createdAt,
 					updatedAt: route.updatedAt,
 					messages: route.messages,
@@ -119,7 +112,6 @@ export class RouteStore {
 					summaries.push({
 						id: raw.id,
 						messageCount: raw.messages?.length ?? 0,
-						connectedChannels: raw.connectedChannels ?? [],
 						createdAt: raw.createdAt,
 						updatedAt: raw.updatedAt,
 					});
@@ -133,21 +125,11 @@ export class RouteStore {
 		}
 	}
 
-	async listByChannel(channelType: string, channelId: string): Promise<RouteSummary[]> {
-		const all = await this.list();
-		return all.filter((s) =>
-			s.connectedChannels.some((c) => c.channelType === channelType && c.channelId === channelId),
-		);
-	}
-
-	async create(id: string, channelType: string, channelId: string): Promise<Route> {
+	async create(id: string): Promise<Route> {
 		const now = Date.now();
 		const route: Route = {
 			id,
 			messages: [],
-			connectedChannels: [{ channelType, channelId }],
-			originChannelType: channelType,
-			originChannelId: channelId,
 			createdAt: now,
 			updatedAt: now,
 		};
@@ -155,19 +137,10 @@ export class RouteStore {
 		return route;
 	}
 
-	async getOrCreate(id: string, channelType: string, channelId: string): Promise<Route> {
+	async getOrCreate(id: string): Promise<Route> {
 		const existing = await this.get(id);
-		if (existing) {
-			const channelExists = existing.connectedChannels.some(
-				(c) => c.channelType === channelType && c.channelId === channelId,
-			);
-			if (!channelExists) {
-				existing.connectedChannels.push({ channelType, channelId });
-				await this.save(existing);
-			}
-			return existing;
-		}
-		return this.create(id, channelType, channelId);
+		if (existing) return existing;
+		return this.create(id);
 	}
 
 	generateId(): string {

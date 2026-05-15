@@ -27,7 +27,7 @@ export const newCommand: CommandDefinition = {
 	type: "local",
 	async execute(ctx: CommandContext): Promise<CommandResult> {
 		const newId = ctx.newRouteId();
-		await ctx.routeStore.create(newId, ctx.channelType, ctx.channelId);
+		await ctx.routeStore.create(newId);
 		ctx.switchRoute(newId);
 		return { type: "display", text: `New route started: ${newId}` };
 	},
